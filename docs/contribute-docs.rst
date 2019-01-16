@@ -20,6 +20,17 @@ On debian like:
                     plantuml \
                     python-sphinx
 
+On OSX like:
+
+.. code-block:: bash
+
+    $ brew install sphinx-doc
+    $ brew link sphinx-doc --force
+    $ brew install plantuml
+    $ sudo pip install sphinxcontrib-plantuml
+    $ sudo pip install sphinx_rtd_theme
+
+
 This documentation can be rendered on your side by following these steps:
  - *cd <COMET_APP_HOME>/docs*
  - *pip install -r requirements.txt*
