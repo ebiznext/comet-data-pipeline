@@ -2,8 +2,9 @@ package com.ebiznext.comet.schema.model
 
 import java.io.InputStream
 
+import cats.data.Validated.{Invalid, Valid}
 import com.ebiznext.comet.TestHelper
-import org.scalatest.{FlatSpec, Matchers}
+
 
 class TypesSpec extends TestHelper {
 
@@ -13,7 +14,7 @@ class TypesSpec extends TestHelper {
     val lines =
       scala.io.Source.fromInputStream(stream).getLines().mkString("\n")
     val types = mapper.readValue(lines, classOf[Types])
-    types.checkValidity() shouldBe Right(true)
+    Types.checkValidity(types) shouldBe Valid(types)
   }
 
   "Duplicate  type names" should "be refused" in {
@@ -31,8 +32,8 @@ class TypesSpec extends TestHelper {
       """.stripMargin
 
     val types = mapper.readValue(lines, classOf[Types])
-    types.checkValidity() shouldBe Left(
-      List("long is defined 2 times. A type can only be defined once.")
+    Types.checkValidity(types) shouldBe Invalid(
+      List("Not good ! I have 2 for this occurence", "Not good ! I have 2 for this occurence")
     )
 
   }
@@ -56,7 +57,7 @@ class TypesSpec extends TestHelper {
       """.stripMargin
     val types = mapper.readValue(lines, classOf[Types])
 
-    types.checkValidity() shouldBe Right(true)
+    Types.checkValidity(types) shouldBe Valid(types)
 
     "2019-01-31 09:30:49.662" shouldBe types.types
       .find(_.name == "timeinmillis")

@@ -1,39 +1,31 @@
 package com.ebiznext.comet.schema
 
-import scala.collection.mutable
+import cats.data.Validated
+import cats.data.Validated.{Invalid, Valid}
+import cats.implicits._
 
 package object model {
 
+  type ValidationResult[A] = Validated[List[String], A]
   /**
-    * Utility to extract duplicates and their number of occurrences
+    * Utility to extract duplicates and their number of occurrences for a unique value
     *
-    * @param values       : Liste of strings
-    * @param errorMessage : Error Message that should contains placeholders for the value(%s) and number of occurrences (%d)
-    * @return List of tuples contains for ea  ch duplicate the number of occurrences
+    * @param value : A string value
+    * @param values : List of strings
+    * @return The value if it's valid
     */
-  def duplicates(values: List[String], errorMessage: String): Either[List[String], Boolean] = {
-    val errorList: mutable.MutableList[String] = mutable.MutableList.empty
-    val duplicates = values.groupBy(identity).mapValues(_.size).filter {
-      case (key, size) => size > 1
-    }
-    duplicates.foreach {
-      case (key, size) =>
-        errorList += errorMessage.format(key, size)
-    }
-    if (errorList.nonEmpty)
-      Left(errorList.toList)
-    else
-      Right(true)
+  def checkDuplicate(value: String, values: List[String]): ValidationResult[String] = {
+    val occurences = values.filter(_ == value)
+    if (occurences.size > 1) Invalid(List(s"Not good ! I have ${occurences.size} for this occurence")) else Valid(value)
   }
 
-  def combine(
-    errors1: Either[List[String], Boolean],
-    errors2: Either[List[String], Boolean]*
-  ): Either[List[String], Boolean] = {
-    val allErrors = errors1 :: List(errors2: _*)
-    val errors = allErrors.collect {
-      case Left(err) => err
-    }.flatten
-    if (errors.isEmpty) Right(true) else Left(errors)
-  }
+
+  /**
+    * Utility to extract duplicates and their number of occurrences for a list of values
+    *
+    * @param values : List of strings
+    * @return The list of values if it's valid
+    */
+  def checkDuplicates(values: List[String]): ValidationResult[List[String]] =
+    values.traverse(checkDuplicate(_, values))
 }

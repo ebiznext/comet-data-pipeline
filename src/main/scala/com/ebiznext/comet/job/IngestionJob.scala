@@ -1,5 +1,6 @@
 package com.ebiznext.comet.job
 
+import cats.data.Validated.{Invalid, Valid}
 import com.ebiznext.comet.config.{DatasetArea, HiveArea, Settings}
 import com.ebiznext.comet.schema.handlers.StorageHandler
 import com.ebiznext.comet.schema.model._
@@ -173,10 +174,10 @@ trait IngestionJob extends SparkJob {
     * @return : Spark Session used for the job
     */
   def run(): SparkSession = {
-    domain.checkValidity(types) match {
-      case Left(errors) =>
+    Domain.checkValidity(domain,types) match {
+      case Invalid(errors) =>
         errors.foreach(err => logger.error(err))
-      case Right(_) =>
+      case Valid(_) =>
         schema.presql.getOrElse(Nil).foreach(session.sql)
         val dataset = loadDataSet()
         val (rejectedRDD, acceptedRDD) = ingest(dataset)

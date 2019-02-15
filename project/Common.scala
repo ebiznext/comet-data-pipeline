@@ -81,6 +81,7 @@ object Versions {
   val betterFiles = "3.6.0"
   val jackson = "2.6.5"
   val configs = "0.4.4"
+  val cats = "1.6.0"
 }
 
 object Resolvers {

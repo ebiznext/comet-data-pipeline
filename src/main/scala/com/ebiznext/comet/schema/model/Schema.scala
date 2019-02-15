@@ -4,7 +4,9 @@ import java.util.regex.Pattern
 
 import org.apache.spark.sql.types.{StructField, StructType}
 
-import scala.collection.mutable
+import cats.data.Validated.{Invalid, Valid}
+import cats.implicits._
+
 
 /**
   * How dataset are merge
@@ -72,6 +74,12 @@ case class Schema(
       (attr.name, attr.getFinalName())
     }
   }
+}
+
+/**
+  * Companion object used to check the schema validation
+  */
+object Schema {
 
   /**
     * Check attribute definition correctness :
@@ -80,29 +88,28 @@ case class Schema(
     *   - attribute name can occur only once in the schema
     *
     * @param types : List of globally defined types
-    * @return error list of true
+    * @param schema : A schema
+    * @return The schema if is valid
     */
-  def checkValidity(types: List[Type]): Either[List[String], Boolean] = {
-    val errorList: mutable.MutableList[String] = mutable.MutableList.empty
-    val tableNamePattern = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]{1,256}")
-    if (!tableNamePattern.matcher(name).matches())
-      errorList += s"Schema with name $name should respect the pattern ${tableNamePattern.pattern()}"
-
-    attributes.foreach { attribute =>
-      for (errors <- attribute.checkValidity(types).left) {
-        errorList ++= errors
-      }
+  def checkValidity(schema: Schema, types: List[Type]) : ValidationResult[Schema] = {
+    def validateTableName(name: String) : ValidationResult[String] = {
+      val tableNamePattern = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]{1,256}")
+      if (!tableNamePattern.matcher(name).matches())
+        Invalid(List(s"Schema with name $name should respect the pattern ${tableNamePattern.pattern()}"))
+      else
+        Valid(name)
     }
 
-    val duplicateErrorMessage =
-      "%s is defined %d times. An attribute can only be defined once."
-    for (errors <- duplicates(attributes.map(_.name), duplicateErrorMessage).left) {
-      errorList ++= errors
+    def validateAttributes(attributes: List[Attribute], types: List[Type]): ValidationResult[List[Attribute]] = {
+      attributes.traverse(Attribute.checkValidity(_,types))
+
     }
 
-    if (errorList.nonEmpty)
-      Left(errorList.toList)
-    else
-      Right(true)
+    val tableNameVal = validateTableName(schema.name)
+    val attributeVal = validateAttributes(schema.attributes, types)
+
+    (tableNameVal,attributeVal).mapN((tableName,attribute) => Schema(tableName,schema.pattern,attribute,schema.metadata, schema.merge,
+      schema.comment,schema.presql,schema.postsql))
+
   }
 }

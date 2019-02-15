@@ -6,8 +6,9 @@ import java.util.regex.Pattern
 
 import com.ebiznext.comet.schema.model.PrimitiveType.{date, timestamp}
 import org.apache.spark.sql.types.StructField
+import cats.data.Validated.{Invalid, Valid}
+import cats.implicits._
 
-import scala.collection.mutable
 import scala.util.Try
 
 /**
@@ -15,15 +16,7 @@ import scala.util.Try
   *
   * @param types : Type list
   */
-case class Types(types: List[Type]) {
-
-  def checkValidity(): Either[List[String], Boolean] = {
-    val typeNames = types.map(_.name)
-    val dup: Either[List[String], Boolean] =
-      duplicates(typeNames, s"%s is defined %d times. A type can only be defined once.")
-    combine(dup, types.map(_.checkValidity()): _*)
-  }
-}
+case class Types(types: List[Type])
 
 /**
   * Semantic Type
@@ -63,35 +56,73 @@ case class Type(
     StructField(fieldName, primitiveType.sparkType, nullable)
       .withComment(comment.getOrElse(""))
   }
+}
 
-  def checkValidity(): Either[List[String], Boolean] = {
-    val errorList: mutable.MutableList[String] = mutable.MutableList.empty
+/**
+  * Companion object used to check the types validation
+  */
+object Types {
 
-    val patternIsValid = Try {
-      primitiveType match {
-        case PrimitiveType.struct =>
-        case PrimitiveType.date =>
-          new SimpleDateFormat(pattern)
-        case PrimitiveType.timestamp =>
-          pattern match {
-            case "epoch_second" | "epoch_milli"                              =>
-            case _ if PrimitiveType.formatters.keys.toList.contains(pattern) =>
-            case _ =>
-              DateTimeFormatter.ofPattern(pattern)
-          }
-        case _ =>
-          Pattern.compile(pattern)
-      }
-    }
-    if (patternIsValid.isFailure)
-      errorList += s"Invalid Pattern $pattern in type $name"
-    val ok = sample.forall(this.matches)
-    if (!ok)
-      errorList += s"Sample $sample does not match pattern $pattern in type $name"
-    if (errorList.nonEmpty)
-      Left(errorList.toList)
-    else
-      Right(true)
+  def checkValidity(types: Types): ValidationResult[Types] = {
+    val valDup = checkDuplicates(types.types.map(_.name))
+    val valInnerTypes = types.types.traverse(Type.checkValidity)
+    val globalCheck: ValidationResult[List[Type]] = valDup *> valInnerTypes
+
+    globalCheck.map(Types.apply)
   }
+}
 
+/**
+  * Companion object used to check the type validation
+  */
+object Type {
+
+  /**
+    * Check type definition correctness :
+    *   - pattern should be valid foreach type
+    *   - sample parameter should be match with his defined pattern
+    *
+    * @param types : List of globally defined types
+    * @return The type if is valid
+    */
+  def checkValidity(types: Type): ValidationResult[Type] = {
+    def validatePattern(primitiveType: PrimitiveType, name: String, pattern: String) : ValidationResult[String] = {
+      val patternIsValid = Try {
+        primitiveType match {
+          case PrimitiveType.struct =>
+          case PrimitiveType.date =>
+            new SimpleDateFormat(pattern)
+          case PrimitiveType.timestamp =>
+            pattern match {
+              case "epoch_second" | "epoch_milli" =>
+              case _ if PrimitiveType.formatters.keys.toList.contains(pattern) =>
+              case _ =>
+                DateTimeFormatter.ofPattern(pattern)
+            }
+          case _ =>
+            Pattern.compile(pattern)
+        }
+      }
+      if (patternIsValid.isFailure)
+        Invalid(List(s"Invalid Pattern $pattern in type $name"))
+      else
+        Valid(pattern)
+    }
+
+    def validateSample(sample: Option[String],types: Type): ValidationResult[Option[String]] ={
+      val ok = sample.forall(types.matches)
+      val pattern = types.pattern
+      val name = types.name
+      if (!ok)
+        Invalid(List(s"Sample $sample does not match pattern $pattern in type $name"))
+      else
+        Valid(sample)
+    }
+
+
+    val sampleVal = validatePattern(types.primitiveType, types.name, types.pattern)
+    val typeErrorVal = validateSample(types.sample, types)
+
+    (sampleVal,typeErrorVal).mapN((res1,res2) => Type(types.name,res1,types.primitiveType,res2,types.comment,types.stat))
+  }
 }

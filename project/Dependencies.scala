@@ -35,7 +35,11 @@ object Dependencies {
     "org.apache.spark" %% "spark-hive" % Versions.spark % "provided",
     "org.apache.spark" %% "spark-mllib" % Versions.spark % "provided"
   )
+  
+  val cats = Seq(
+    "org.typelevel" %% "cats-core" % Versions.cats
+  )
 
-  val dependencies = logging ++ typedConfigs ++ spark ++ okhttp ++ betterfiles ++ jackson ++ scalaTest
+  val dependencies = logging ++ typedConfigs ++ spark ++ okhttp ++ betterfiles ++ jackson ++ scalaTest ++ cats
 
 }
