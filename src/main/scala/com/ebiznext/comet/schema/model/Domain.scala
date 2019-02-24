@@ -24,7 +24,9 @@ import java.util.regex.Pattern
 
 import better.files.File
 
-import scala.collection.mutable
+import cats.data.Validated.{Invalid, Valid}
+import cats.implicits._
+
 
 /**
   * Let's say you are wiling to import from you Sales system customers and orders.
@@ -73,6 +75,13 @@ case class Domain(
     */
   def getAck(): String = ack.map(ack => if (ack.nonEmpty) "." + ack else ack).getOrElse(".ack")
 
+}
+
+/**
+  * Companion object used to check the domain validation
+  */
+object Domain {
+
   /**
     * Is this Domain valid ? A domain is valid if :
     *   - The domain name is a valid attribute
@@ -80,40 +89,37 @@ case class Domain(
     *   - No schema is defined twice
     *   - Partitions columns are valid columns
     *   - The input directory is a valid path
-    * @param types
-    * @return
+    *
+    * @param types : List of defined types
+    * @param domain : A domain
+    * @return The domain if is valid
     */
-  def checkValidity(types: List[Type]): Either[List[String], Boolean] = {
-    val errorList: mutable.MutableList[String] = mutable.MutableList.empty
-
-    // Check Domain name validity
-    val dbNamePattern = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]{1,100}")
-    if (!dbNamePattern.matcher(name).matches())
-      errorList += s"Schema with name $name should respect the pattern ${dbNamePattern.pattern()}"
-
-    // Check Schema validity
-    schemas.foreach { schema =>
-      for (errors <- schema.checkValidity(types).left) {
-        errorList ++= errors
-      }
+  def checkValidity(domain: Domain, types: List[Type]): ValidationResult[Domain] = {
+    def validateNameDomain(name: String): ValidationResult[String] = {
+      val dbNamePattern = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]{1,100}")
+      if (!dbNamePattern.matcher(name).matches())
+        Invalid(List(s"Schema with name $name should respect the pattern ${dbNamePattern.pattern()}"))
+      else Valid(name)
     }
 
-    val duplicatesErrorMessage =
-      "%s is defined %d times. A schema can only be defined once."
-    for (errors <- duplicates(schemas.map(_.name), duplicatesErrorMessage).left) {
-      errorList ++= errors
+    def validateSchema(schemas: List[Schema], types: List[Type]): ValidationResult[List[Schema]] = {
+      schemas.traverse(Schema.checkValidity(_, types))
     }
 
-    // TODO Check partition columns
-
-    // TODO Validate directory
-    val inputDir = File(this.directory)
-    if (!inputDir.exists) {
-      errorList += s"$directory not found"
+    def validateDirectory(directory: String): ValidationResult[String] = {
+      val inputDir = File(directory)
+      if (!inputDir.exists)
+        Invalid(List(s"$directory not found"))
+      else
+        Valid(directory)
     }
-    if (errorList.nonEmpty)
-      Left(errorList.toList)
-    else
-      Right(true)
+
+    val nameDomainVal = validateNameDomain(domain.name)
+    val schemaVal = validateSchema(domain.schemas, types)
+    val directory = validateDirectory(domain.directory)
+
+    (nameDomainVal, schemaVal, directory).mapN((nameDV, schemaV, dir) => Domain(nameDV, dir, domain.metadata, schemaV, domain.comment,
+      domain.extensions, domain.ack))
   }
+
 }

@@ -22,10 +22,12 @@ package com.ebiznext.comet.schema.model
 
 import java.util.regex.Pattern
 
+import cats.data.Validated.{Invalid, Valid}
+import cats.implicits._
+
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.spark.sql.types._
 
-import scala.collection.mutable
 
 /**
   * A field in the schema. For struct fields, the field "attributes" contains all sub attributes
@@ -51,51 +53,6 @@ case class Attribute(
   stat: Option[Stat] = None,
   attributes: Option[List[Attribute]] = None
 ) {
-
-  /**
-    * Check attribute validity
-    * An attribute is valid if :
-    *     - Its name is a valid identifier
-    *     - its type is defined
-    *     - When a privacy function is defined its primitive type is a string
-    *
-    * @param types : List of defined types.
-    * @return true if attribute is valid
-    */
-  def checkValidity(types: List[Type]): Either[List[String], Boolean] = {
-    val errorList: mutable.MutableList[String] = mutable.MutableList.empty
-    if (`type` == null)
-      errorList += s"$this : unspecified type"
-
-    val colNamePattern = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]{1,767}")
-    if (!colNamePattern.matcher(name).matches())
-      errorList += s"attribute with name $name should respect the pattern ${colNamePattern.pattern()}"
-
-    if (!rename.forall(colNamePattern.matcher(_).matches()))
-      errorList += s"renamed attribute with renamed name '$rename' should respect the pattern ${colNamePattern.pattern()}"
-
-    val primitiveType = types.find(_.name == `type`).map(_.primitiveType)
-
-    primitiveType match {
-      case Some(tpe) =>
-        if (tpe != PrimitiveType.string && getPrivacy() != PrivacyLevel.NONE)
-          errorList += s"Attribute $this : string is the only supported primitive type for an attribute when privacy is requested"
-        if (tpe == PrimitiveType.struct && attributes.isEmpty)
-          errorList += s"Attribute $this : Struct types have at least one attribute."
-        if (tpe != PrimitiveType.struct && attributes.isDefined)
-          errorList += s"Attribute $this : Simple attributes cannot have sub-attributes"
-      case None if attributes.isEmpty => errorList += s"Invalid Type ${`type`}"
-      case _                          => // good boy
-    }
-    attributes.collect {
-      case list if list.isEmpty =>
-        errorList += s"Attribute $this : when present, attributes list cannot be empty."
-    }
-    if (errorList.nonEmpty)
-      Left(errorList.toList)
-    else
-      Right(true)
-  }
 
   /**
     *
@@ -155,4 +112,85 @@ case class Attribute(
 
   def getStat(): Stat = this.stat.getOrElse(Stat.NONE)
 
+}
+
+/**
+  * Companion object used to check the attribute validation
+  */
+object Attribute {
+
+  /**
+    * Check attribute validity
+    * An attribute is valid if :
+    *     - Its name is a valid identifier
+    *     - its type is defined
+    *     - When a privacy function is defined its primitive type is a string
+    *
+    * @param types : List of defined types
+    * @param att : An attrbute
+    * @return The arribute if is valid
+    */
+  def checkValidity(att: Attribute,types: List[Type]): ValidationResult[Attribute] = {
+    def validateNullType(`type`: String): ValidationResult[String] =
+      if (`type` == null) Invalid(List(s"$att : unspecified type")) else Valid(`type`)
+
+    def validateColNamePattern(name: String): ValidationResult[String] = {
+      val colNamePattern = Pattern.compile("[a-zA-Z][a-zA-Z0-9_]{1,767}")
+      if (!colNamePattern.matcher(name).matches())
+        Invalid(List(s"attribute with name $name should respect the pattern ${colNamePattern.pattern()}"))
+      else
+        Valid(name)
+    }
+
+    def validatePrimType(`type`: String, privacyLevel: PrivacyLevel,types: List[Type],attributes: Option[List[Attribute]]): ValidationResult[String] = {
+      val primitiveType = types.find(_.name == `type`).map(_.primitiveType).getOrElse(None)
+
+      def checkPrimitivePrivacy() : ValidationResult[String]=
+        if (primitiveType != PrimitiveType.string && privacyLevel != PrivacyLevel.NONE)
+          Invalid(List(s"Attribute $att : string is the only supported primitive type for an attribute when privacy is requested"))
+        else
+          Valid(`type`)
+
+
+      def checkPrimitiveStructure()  : ValidationResult[String] =
+        if (primitiveType == PrimitiveType.struct && attributes.isEmpty)
+          Invalid(List(s"Attribute $att : Struct types have at least one attribute."))
+        else
+          Valid(`type`)
+
+
+      def checkPrimitiveSub()  : ValidationResult[String] = {
+        if (primitiveType != PrimitiveType.struct && attributes.isDefined)
+          Invalid(List(s"Attribute $att : Simple attributes cannot have sub-attributes"))
+        else
+          Valid(`type`)
+      }
+
+      def checkPrimitiveType()  : ValidationResult[String] = {
+        if (primitiveType == None && attributes.isEmpty)
+          Invalid(List(s"Invalid Type ${`type`}"))
+        else
+          Valid(`type`)
+      }
+
+      checkPrimitiveType *> checkPrimitivePrivacy *> checkPrimitiveStructure *> checkPrimitiveSub
+
+    }
+
+    def validateAttributes(attributes: Option[List[Attribute]]): ValidationResult[Option[List[Attribute]]]= {
+      val attributeList = attributes.getOrElse(List())
+      if(attributeList.isEmpty)
+        Invalid(List(s"Attribute $att : when present, attributes list cannot be empty."))
+      else
+        Valid(attributes)
+    }
+
+    val nullTypeVal = validateNullType(att.`type`)
+    val primTypeVal = validatePrimType(att.`type`, att.getPrivacy(),types, att.attributes)
+    val globalTypeVal = nullTypeVal *> primTypeVal //productRight
+    val attributeVal = validateAttributes(att.attributes)
+    val colNameVal = validateColNamePattern(att.name)
+    (globalTypeVal, colNameVal, attributeVal).mapN((gbType,colName,attrib) => Attribute(colName,gbType,att.array,att.required,att.privacy,
+      att.comment, att.rename,att.stat,attrib))
+  }
 }

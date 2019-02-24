@@ -22,6 +22,7 @@ package com.ebiznext.comet.schema.model
 
 import java.io.InputStream
 
+import cats.data.Validated.Invalid
 import com.ebiznext.comet.TestHelper
 import org.scalatest.{FlatSpec, Matchers}
 
@@ -41,7 +42,7 @@ class SchemaSpec extends FlatSpec with Matchers with TestHelper {
       Some(PrivacyLevel.MD5) // Should raise an error. Privacy cannot be applied on types other than string
     )
 
-    attr.checkValidity(types.types) shouldBe Left(List("Invalid Type invalid-type"))
+    Attribute.checkValidity(attr,types.types) shouldBe  Invalid(List("Invalid Type invalid-type",s"Attribute $attr : string is the only supported primitive type for an attribute when privacy is requested" ,s"Attribute $attr : when present, attributes list cannot be empty."))
   }
 
   "Attribute privacy" should "be applied on string type only" in {
@@ -57,10 +58,11 @@ class SchemaSpec extends FlatSpec with Matchers with TestHelper {
       true,
       Some(PrivacyLevel.MD5) // Should raise an error. Privacy cannot be applied on types other than string
     )
-    attr.checkValidity(types.types) shouldBe
-    Left(
+    Attribute.checkValidity(attr,types.types) shouldBe
+    Invalid(
       List(
-        "Attribute Attribute(attr,long,Some(true),true,Some(MD5),None,None,None,None) : string is the only supported primitive type for an attribute when privacy is requested"
+        s"Attribute $attr : string is the only supported primitive type for an attribute when privacy is requested",
+        s"Attribute $attr : when present, attributes list cannot be empty."
       )
     )
   }
@@ -80,11 +82,11 @@ class SchemaSpec extends FlatSpec with Matchers with TestHelper {
       attributes = Some(List[Attribute]())
     )
     val expectedErrors = List(
-      "Attribute Attribute(attr,long,Some(true),true,Some(MD5),None,None,None,Some(List())) : string is the only supported primitive type for an attribute when privacy is requested",
-      "Attribute Attribute(attr,long,Some(true),true,Some(MD5),None,None,None,Some(List())) : Simple attributes cannot have sub-attributes",
-      "Attribute Attribute(attr,long,Some(true),true,Some(MD5),None,None,None,Some(List())) : when present, attributes list cannot be empty."
+      s"Attribute $attr : string is the only supported primitive type for an attribute when privacy is requested",
+      s"Attribute $attr : Simple attributes cannot have sub-attributes",
+      s"Attribute $attr : when present, attributes list cannot be empty."
     )
 
-    attr.checkValidity(types.types) shouldBe Left(expectedErrors)
+    Attribute.checkValidity(attr,types.types) shouldBe Invalid(expectedErrors)
   }
 }
