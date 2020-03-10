@@ -1,7 +1,7 @@
 package com.ebiznext.comet.job.bqload
 
 import com.ebiznext.comet.config.Settings
-import com.ebiznext.comet.config.Settings.IndexSinkSettings
+import com.ebiznext.comet.config.IndexSinkSettings
 import com.ebiznext.comet.utils.{SparkJob, Utils}
 import com.google.cloud.bigquery.testing.RemoteBigQueryHelper
 import com.google.cloud.bigquery.{Schema => BQSchema, _}

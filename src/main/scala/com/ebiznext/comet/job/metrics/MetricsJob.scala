@@ -1,6 +1,6 @@
 package com.ebiznext.comet.job.metrics
 
-import com.ebiznext.comet.config.{DatasetArea, Settings}
+import com.ebiznext.comet.config.{DatasetArea, IndexSinkSettings, Settings}
 import com.ebiznext.comet.job.ingest.MetricRecord
 import com.ebiznext.comet.job.jdbcload.JdbcLoadConfig
 import com.ebiznext.comet.job.metrics.Metrics.{ContinuousMetric, DiscreteMetric}
@@ -15,7 +15,7 @@ import org.apache.spark.sql.execution.streaming.FileStreamSource.Timestamp
 import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 /** To record statistics with other information during ingestion.
   *
@@ -371,15 +371,15 @@ root
   private def sinkMetrics(metricsDf: DataFrame): Try[Unit] = {
     if (settings.comet.metrics.active) {
       settings.comet.metrics.index match {
-        case Settings.IndexSinkSettings.None =>
+        case IndexSinkSettings.None =>
           Success(())
 
-        case Settings.IndexSinkSettings.BigQuery(bqDataset) =>
+        case IndexSinkSettings.BigQuery(bqDataset) =>
           Try {
             sinkMetricsToBigQuery(metricsDf, bqDataset)
           }
 
-        case Settings.IndexSinkSettings.Jdbc(jdbcConnection, partitions, batchSize) =>
+        case IndexSinkSettings.Jdbc(jdbcConnection, partitions, batchSize) =>
           Try {
             val jdbcConfig = JdbcLoadConfig.fromComet(
               jdbcConnection,
@@ -391,6 +391,8 @@ root
             )
             sinkMetricsToJdbc(jdbcConfig)
           }
+        case IndexSinkSettings.ElasticSearch(_) =>
+          Failure(new UnsupportedOperationException("can't sink to ElasticSearch")) // TODO: does this make sense?
       }
     } else {
       Success(())

@@ -86,51 +86,6 @@ object Settings extends StrictLogging {
   final case class Elasticsearch(active: Boolean, options: juMap[String, String])
 
   /**
-    * Configuration for [[IndexSink]]
-    *
-    * This is used to define an auxiliary output for Audit or Metrics data, in addition to the Parquets
-    * The default Index Sink is None, but additional types exists (such as BigQuery or Jdbc)
-    *
-    */
-  @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS)
-  sealed abstract class IndexSinkSettings(val `type`: String) {
-    def indexSinkType: IndexSink
-  }
-
-  object IndexSinkSettings {
-
-    /**
-      * A no-operation Index Output (disabling external output beyond the business area parquets)
-      */
-    @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS)
-    @JsonDeserialize(builder = classOf[None.NoneBuilder])
-    case object None
-        extends IndexSinkSettings("None")
-        with CometJacksonModule.JacksonProtectedSingleton {
-      override def indexSinkType: IndexSink.None.type = IndexSink.None
-
-      class NoneBuilder extends CometJacksonModule.ProtectedSingletonBuilder[None.type]
-    }
-
-    /**
-      * Describes an Index Output delivering values into a BigQuery dataset
-      */
-    final case class BigQuery(bqDataset: String) extends IndexSinkSettings("BigQuery") {
-      override def indexSinkType: IndexSink.BQ.type = IndexSink.BQ
-    }
-
-    /**
-      * Describes an Index Output delivering values into a JDBC-accessible SQL database
-      */
-    final case class Jdbc(jdbcConnection: String, partitions: Int = 1, batchSize: Int = 1000)
-        extends IndexSinkSettings("Jdbc") {
-      override def indexSinkType: IndexSink.JDBC.type = IndexSink.JDBC
-    }
-    // TODO: IndexSink has ES, too. Is there a use case for this?
-    // Maybe later; additional sink types (e.g. Kafka/Pulsar)?
-  }
-
-  /**
     *
     * @param discreteMaxCardinality : Max number of unique values allowed in cardinality compute
     *
@@ -276,8 +231,6 @@ object Settings extends StrictLogging {
     }
   }
 
-  private implicit val indexSinkSettinsConfigs: Configs[IndexSinkSettings] =
-    Configs.derive[IndexSinkSettings]
   private implicit val jdbcEngineConfigs: Configs[JdbcEngine] = Configs.derive[JdbcEngine]
 
   def apply(config: Config): Settings = {

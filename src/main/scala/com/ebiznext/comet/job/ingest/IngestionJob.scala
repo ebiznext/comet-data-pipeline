@@ -3,7 +3,7 @@ package com.ebiznext.comet.job.ingest
 import java.sql.Timestamp
 import java.time.Instant
 
-import com.ebiznext.comet.config.Settings.IndexSinkSettings
+import com.ebiznext.comet.config.IndexSinkSettings
 import com.ebiznext.comet.config.{DatasetArea, Settings, StorageArea}
 import com.ebiznext.comet.job.bqload.{BigQueryLoadConfig, BigQueryLoadJob}
 import com.ebiznext.comet.job.index.{IndexConfig, IndexJob}

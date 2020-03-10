@@ -23,7 +23,7 @@ package com.ebiznext.comet.job.ingest
 import java.sql.Timestamp
 
 import com.ebiznext.comet.config.Settings
-import com.ebiznext.comet.config.Settings.IndexSinkSettings
+import com.ebiznext.comet.config.IndexSinkSettings
 import com.ebiznext.comet.job.bqload.{BigQueryLoadConfig, BigQueryLoadJob}
 import com.ebiznext.comet.job.jdbcload.{JdbcLoadConfig, JdbcLoadJob}
 import com.ebiznext.comet.utils.FileLock

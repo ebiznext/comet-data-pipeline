@@ -47,23 +47,24 @@ import scala.language.postfixOps
   * @param write      : Write mode, APPEND by default
   * @param partition  : Partition columns, no partitioning by default
   * @param index      : should the dataset be indexed in elasticsearch after ingestion ?
+  *
   */
 @JsonDeserialize(using = classOf[MetadataDeserializer])
 case class Metadata(
-  mode: Option[Mode] = None,
-  format: Option[Format] = None,
-  encoding: Option[String] = None,
-  multiline: Option[Boolean] = None,
-  array: Option[Boolean] = None,
-  withHeader: Option[Boolean] = None,
-  separator: Option[String] = None,
-  quote: Option[String] = None,
-  escape: Option[String] = None,
-  write: Option[WriteMode] = None,
-  partition: Option[Partition] = None,
-  index: Option[IndexSink] = None,
-  properties: Option[Map[String, String]] = None
-) {
+                     mode: Option[Mode] = None,
+                     format: Option[Format] = None,
+                     encoding: Option[String] = None,
+                     multiline: Option[Boolean] = None,
+                     array: Option[Boolean] = None,
+                     withHeader: Option[Boolean] = None,
+                     separator: Option[String] = None,
+                     quote: Option[String] = None,
+                     escape: Option[String] = None,
+                     write: Option[WriteMode] = None,
+                     partition: Option[Partition] = None,
+                     index: Option[IndexSink] = None,
+                     properties: Option[Map[String, String]] = None
+                   ) {
   override def toString: String =
     s"""
        |mode:${getIngestMode()}
@@ -80,6 +81,9 @@ case class Metadata(
        |index:${getIndexSink()}
        |properties:${properties}
        """.stripMargin
+
+  /* Note: the reason we have "Java-style accessors" here is that these accessors supply the defaults;
+   * while the constructor arguments may be defined or not */
 
   def getIngestMode(): Mode = mode.getOrElse(FILE)
 
@@ -117,7 +121,7 @@ case class Metadata(
     * @return attribute if merge, the domain attribute otherwise.
     */
   protected def merge[T](parent: Option[T], child: Option[T]): Option[T] =
-    if (child.isDefined) child else parent
+    child.orElse(parent)
 
   /**
     * Merge this metadata with its child.
