@@ -57,8 +57,11 @@ object JdbcLoadConfig {
     comet: Settings.Comet,
     sourceFile: Either[String, DataFrame],
     outputTable: String,
+
+    /* FIXME: replace these two with a single WriteMode or at least non-Google types */
     createDisposition: CreateDisposition = CreateDisposition.CREATE_IF_NEEDED,
     writeDisposition: WriteDisposition = WriteDisposition.WRITE_APPEND,
+
     partitions: Int = 1,
     batchSize: Int = 1000,
     createTableIfAbsent: Boolean = true
