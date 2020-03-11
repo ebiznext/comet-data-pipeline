@@ -1,7 +1,7 @@
 package com.ebiznext.comet.job.bqload
 
 import com.ebiznext.comet.config.Settings
-import com.ebiznext.comet.config.IndexSinkSettings
+import com.ebiznext.comet.config.IndexSink
 import com.ebiznext.comet.utils.{SparkJob, Utils}
 import com.google.cloud.bigquery.testing.RemoteBigQueryHelper
 import com.google.cloud.bigquery.{Schema => BQSchema, _}
@@ -176,10 +176,10 @@ class BigQueryLoadJob(
     */
   override def run(): Try[SparkSession] = {
     val res = settings.comet.audit.index match {
-      case _: IndexSinkSettings.BigQuery if settings.comet.audit.active =>
+      case _: IndexSink.BigQuery if settings.comet.audit.active =>
         runBQSparkConnector()
 
-      case _: IndexSinkSettings.BigQuery =>
+      case _: IndexSink.BigQuery =>
         logger.info("BigQuery Audit selected, but audit is inactive — no output")
         Success(session)
 

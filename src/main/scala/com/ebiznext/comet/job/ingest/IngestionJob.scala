@@ -3,7 +3,7 @@ package com.ebiznext.comet.job.ingest
 import java.sql.Timestamp
 import java.time.Instant
 
-import com.ebiznext.comet.config.IndexSinkSettings
+import com.ebiznext.comet.config.IndexSink
 import com.ebiznext.comet.config.{DatasetArea, Settings, StorageArea}
 import com.ebiznext.comet.job.bqload.{BigQueryLoadConfig, BigQueryLoadJob}
 import com.ebiznext.comet.job.index.{IndexConfig, IndexJob}
@@ -127,24 +127,25 @@ trait IngestionJob extends SparkJob {
   def index(mergedDF: DataFrame): Unit = {
     val meta = schema.mergedMetadata(domain.metadata)
     meta.getIndexSink() match {
-      case Some(IndexSink.ES) if settings.comet.elasticsearch.active =>
+      case Some(IndexSink.ElasticSearch(indexNameOverride)) if settings.comet.elasticsearch.active =>
         val properties = meta.properties
         val config = IndexConfig(
           timestamp = properties.flatMap(_.get("timestamp")),
           id = properties.flatMap(_.get("id")),
           format = "parquet",
+          indexName = indexNameOverride,
           domain = domain.name,
           schema = schema.name
         )
         new IndexJob(config, storageHandler, schemaHandler).run()
-      case Some(IndexSink.BQ) =>
+      case Some(IndexSink.BigQuery(bqDataset)) =>
         val (createDisposition: String, writeDisposition: String) = Utils.getDBDisposition(
           meta.getWriteMode()
         )
         val config = BigQueryLoadConfig(
           sourceFile = Right(mergedDF),
           outputTable = schema.name,
-          outputDataset = domain.name,
+          outputDataset = Option(bqDataset).filterNot(_.isEmpty).getOrElse(domain.name),
           sourceFormat = "parquet",
           createDisposition = createDisposition,
           writeDisposition = writeDisposition,
@@ -158,7 +159,7 @@ trait IngestionJob extends SparkJob {
           case Failure(e) => logger.error("BQLoad Failed", e)
         }
 
-      case Some(IndexSink.JDBC) =>
+      case Some(IndexSink.Jdbc(jdbcName, partitions, batchSize)) =>
         val (createDisposition: CreateDisposition, writeDisposition: WriteDisposition) = {
 
           val (cd, wd) = Utils.getDBDisposition(
@@ -166,9 +167,6 @@ trait IngestionJob extends SparkJob {
           )
           (CreateDisposition.valueOf(cd), WriteDisposition.valueOf(wd))
         }
-        meta.getProperties().get("jdbc").foreach { jdbcName =>
-          val partitions = meta.getProperties().getOrElse("partitions", "1").toInt
-          val batchSize = meta.getProperties().getOrElse("batchsize", "1000").toInt
 
           val jdbcConfig = JdbcLoadConfig.fromComet(
             jdbcName,
@@ -186,9 +184,8 @@ trait IngestionJob extends SparkJob {
             case Success(_) => ;
             case Failure(e) => logger.error("JDBCLoad Failed", e)
           }
-        }
 
-      case Some(IndexSink.None) | None =>
+      case Some(IndexSink.None()) | None =>
         // ignore
         logger.trace("not producing an index, as requested (no sink or sink at None explicitly)")
     }
@@ -489,7 +486,7 @@ object IngestionUtil {
       .limit(settings.comet.audit.maxErrors)
 
     val res = settings.comet.audit.index match {
-      case IndexSinkSettings.BigQuery(dataset) =>
+      case IndexSink.BigQuery(dataset) =>
         val bqConfig = BigQueryLoadConfig(
           Right(rejectedDF),
           outputDataset = dataset,
@@ -503,7 +500,7 @@ object IngestionUtil {
         )
         new BigQueryLoadJob(bqConfig, Some(bigqueryRejectedSchema())).run()
 
-      case IndexSinkSettings.Jdbc(jdbcName, partitions, batchSize) =>
+      case IndexSink.Jdbc(jdbcName, partitions, batchSize) =>
         val jdbcConfig = JdbcLoadConfig.fromComet(
           jdbcName,
           settings.comet,
@@ -515,7 +512,7 @@ object IngestionUtil {
 
         new JdbcLoadJob(jdbcConfig).run()
 
-      case IndexSinkSettings.None =>
+      case IndexSink.None() =>
         Success(())
     }
     res match {

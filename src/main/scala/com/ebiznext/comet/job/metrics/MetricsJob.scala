@@ -1,6 +1,6 @@
 package com.ebiznext.comet.job.metrics
 
-import com.ebiznext.comet.config.{DatasetArea, IndexSinkSettings, Settings}
+import com.ebiznext.comet.config.{DatasetArea, IndexSink, Settings}
 import com.ebiznext.comet.job.ingest.MetricRecord
 import com.ebiznext.comet.job.jdbcload.JdbcLoadConfig
 import com.ebiznext.comet.job.metrics.Metrics.{ContinuousMetric, DiscreteMetric}
@@ -371,15 +371,15 @@ root
   private def sinkMetrics(metricsDf: DataFrame): Try[Unit] = {
     if (settings.comet.metrics.active) {
       settings.comet.metrics.index match {
-        case IndexSinkSettings.None =>
+        case IndexSink.None() =>
           Success(())
 
-        case IndexSinkSettings.BigQuery(bqDataset) =>
+        case IndexSink.BigQuery(bqDataset) =>
           Try {
             sinkMetricsToBigQuery(metricsDf, bqDataset)
           }
 
-        case IndexSinkSettings.Jdbc(jdbcConnection, partitions, batchSize) =>
+        case IndexSink.Jdbc(jdbcConnection, partitions, batchSize) =>
           Try {
             val jdbcConfig = JdbcLoadConfig.fromComet(
               jdbcConnection,
@@ -391,7 +391,8 @@ root
             )
             sinkMetricsToJdbc(jdbcConfig)
           }
-        case IndexSinkSettings.ElasticSearch(_) =>
+
+        case IndexSink.ElasticSearch(_) =>
           Failure(new UnsupportedOperationException("can't sink to ElasticSearch")) // TODO: does this make sense?
       }
     } else {

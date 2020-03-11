@@ -60,10 +60,6 @@ case class Attribute(
   tags: Option[Set[String]] = None
 ) extends LazyLogging {
 
-  override def toString: String =
-    // we pretend the "settings" field does not exist
-    s"Attribute(${name},${`type`},${array},${required},${privacy},${comment},${rename},${metricType},${attributes},${position},${default},${tags})"
-
   /**
     * Check attribute validity
     * An attribute is valid if :

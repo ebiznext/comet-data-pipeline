@@ -21,7 +21,7 @@
 package com.ebiznext.comet.workflow
 
 import better.files.File
-import com.ebiznext.comet.config.{DatasetArea, Settings}
+import com.ebiznext.comet.config.{DatasetArea, IndexSink, Settings}
 import com.ebiznext.comet.job.atlas.{AtlasConfig, AtlasJob}
 import com.ebiznext.comet.job.bqload.{BigQueryLoadConfig, BigQueryLoadJob}
 import com.ebiznext.comet.job.index.{IndexConfig, IndexJob}
@@ -34,6 +34,7 @@ import com.ebiznext.comet.schema.handlers.{LaunchHandler, SchemaHandler, Storage
 import com.ebiznext.comet.schema.model.Format._
 import com.ebiznext.comet.schema.model._
 import com.ebiznext.comet.utils.Utils
+import com.google.cloud.bigquery.JobInfo.{CreateDisposition, WriteDisposition}
 import com.google.cloud.bigquery.{Schema => BQSchema}
 import com.typesafe.scalalogging.StrictLogging
 import org.apache.hadoop.fs.Path
@@ -379,10 +380,10 @@ class IngestionWorkflow(
       )
       action.run() match {
         case Success(_) =>
-          task.getIndexSink() match {
-            case Some(IndexSink.ES) if settings.comet.elasticsearch.active =>
+          task.index match {
+            case Some(IndexSink.ElasticSearch(overrideIndexName)) if settings.comet.elasticsearch.active =>
               index(job, task)
-            case Some(IndexSink.BQ) =>
+            case Some(IndexSink.BigQuery(bqDataset)) =>
               val (createDisposition, writeDisposition) = Utils.getDBDisposition(task.write)
               bqload(
                 BigQueryLoadConfig(
@@ -396,9 +397,7 @@ class IngestionWorkflow(
                   outputPartition = task.properties.flatMap(_.get("timestamp")),
                   days = task.properties.flatMap(_.get("days").map(_.toInt))
                 )
-              )
-            case _ =>
-            // ignore
+              ).get
 
           }
         case Failure(exception) =>

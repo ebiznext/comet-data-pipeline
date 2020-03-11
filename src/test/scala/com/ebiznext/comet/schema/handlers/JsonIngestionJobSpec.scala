@@ -142,3 +142,36 @@ class JsonIngestionJobSpecNoIndexJdbcMetricsJdbcAuditSpec
   override def expectedMetricRecords(implicit settings: Settings): List[MetricRecord] =
     Nil /* TODO: should we not get some here? At least we go to JDBC fine, as far as the schema is concerned. */
 }
+
+
+class JsonIngestionJobSpecJdbcIndexJdbcNoMetricsNoAuditSpec
+  extends JsonIngestionJobSpecBase("Jdbc Index, No Metrics, No Audit") {
+
+  override def configuration: Config =
+    ConfigFactory
+      .parseString("""
+                     |metrics {
+                     |  active = false
+                     |  index {
+                     |    type = "None"
+                     |  }
+                     |}
+                     |
+                     |audit {
+                     |  active = false
+                     |  index {
+                     |    type = "None"
+                     |  }
+                     |}
+                     |""".stripMargin)
+      .withFallback(super.testConfiguration)
+
+  override def expectedAuditLogs(implicit settings: Settings): List[AuditLog] =
+    Nil
+
+  override def expectedRejectRecords(implicit settings: Settings): List[RejectedRecord] =
+    Nil
+
+  override def expectedMetricRecords(implicit settings: Settings): List[MetricRecord] =
+    Nil
+}

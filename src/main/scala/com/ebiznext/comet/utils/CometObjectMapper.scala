@@ -1,5 +1,6 @@
 package com.ebiznext.comet.utils
 
+import com.ebiznext.comet.config.IndexSink
 import com.fasterxml.jackson.annotation.JsonIgnoreType
 import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.databind.module.SimpleModule
@@ -31,6 +32,8 @@ class CometObjectMapper(
     new SimpleModule()
       .setMixInAnnotation(classOf[ObjectMapper], classOf[CometObjectMapper.MixinsForObjectMapper])
   )
+
+  this.registerModule(IndexSink.JacksonModule)
 
   if (injectables.nonEmpty) {
     val iv = new InjectableValues.Std()

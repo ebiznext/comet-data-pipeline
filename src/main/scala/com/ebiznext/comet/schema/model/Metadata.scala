@@ -20,9 +20,11 @@
 
 package com.ebiznext.comet.schema.model
 
+import com.ebiznext.comet.config.IndexSink
 import com.ebiznext.comet.schema.model.Format.DSV
 import com.ebiznext.comet.schema.model.Mode.FILE
 import com.ebiznext.comet.schema.model.WriteMode.APPEND
+import com.fasterxml.jackson.annotation.{JsonIgnore, JsonIgnoreProperties}
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.{DeserializationContext, JsonDeserializer, JsonNode}
@@ -49,7 +51,7 @@ import scala.language.postfixOps
   * @param index      : should the dataset be indexed in elasticsearch after ingestion ?
   *
   */
-@JsonDeserialize(using = classOf[MetadataDeserializer])
+@JsonIgnoreProperties(Array( /* Can ignore old properties for backcompat of domain files: */ /*"dateFormat", "timestampFormat" */))
 case class Metadata(
                      mode: Option[Mode] = None,
                      format: Option[Format] = None,
@@ -85,32 +87,46 @@ case class Metadata(
   /* Note: the reason we have "Java-style accessors" here is that these accessors supply the defaults;
    * while the constructor arguments may be defined or not */
 
+  @JsonIgnore
   def getIngestMode(): Mode = mode.getOrElse(FILE)
 
+  @JsonIgnore
   def getFormat(): Format = format.getOrElse(DSV)
 
+  @JsonIgnore
   def getEncoding(): String = encoding.getOrElse("UTF-8")
 
+  @JsonIgnore
   def getMultiline(): Boolean = multiline.getOrElse(false)
 
+  @JsonIgnore
   def isArray(): Boolean = array.getOrElse(false)
 
+  @JsonIgnore
   def isWithHeader(): Boolean = withHeader.getOrElse(true)
 
+  @JsonIgnore
   def getSeparator(): String = separator.getOrElse(";")
 
+  @JsonIgnore
   def getQuote(): String = quote.getOrElse("\"")
 
+  @JsonIgnore
   def getEscape(): String = escape.getOrElse("\\")
 
+  @JsonIgnore
   def getWriteMode(): WriteMode = write.getOrElse(APPEND)
 
-  def getPartitionAttributes(): List[String] = partition.map(_.getAtrributes()).getOrElse(Nil)
+  @JsonIgnore
+  def getPartitionAttributes(): List[String] = partition.map(_.attributes).getOrElse(Nil)
 
-  def getSamplingStrategy(): Double = partition.map(_.getSampling()).getOrElse(0.0)
+  @JsonIgnore
+  def getSamplingStrategy(): Double = partition.map(_.sampling).getOrElse(0.0)
 
+  @JsonIgnore
   def getIndexSink(): Option[IndexSink] = index
 
+  @JsonIgnore
   def getProperties(): Map[String, String] = properties.getOrElse(Map.empty)
 
   /**
@@ -178,75 +194,4 @@ object Metadata {
     None,
     None
   )
-}
-
-class MetadataDeserializer extends JsonDeserializer[Metadata] {
-  override def deserialize(jp: JsonParser, ctx: DeserializationContext): Metadata = {
-    val node: JsonNode = jp.getCodec().readTree[JsonNode](jp)
-
-    def isNull(node: JsonNode, field: String): Boolean =
-      node.get(field) == null || node.get(field).isNull
-
-    val mode =
-      if (isNull(node, "mode")) None
-      else Some(Mode.fromString(node.get("mode").asText))
-    val format =
-      if (isNull(node, "format")) None
-      else Some(Format.fromString(node.get("format").asText))
-    val encoding =
-      if (isNull(node, "encoding")) None
-      else Some(node.get("encoding").asText)
-    val multiline =
-      if (isNull(node, "multiline")) None else Some(node.get("multiline").asBoolean())
-    val array =
-      if (isNull(node, "array")) None else Some(node.get("array").asBoolean())
-    val withHeader =
-      if (isNull(node, "withHeader")) None
-      else Some(node.get("withHeader").asBoolean())
-    val separator =
-      if (isNull(node, "separator")) None else Some(node.get("separator").asText)
-    val quote = if (isNull(node, "quote")) None else Some(node.get("quote").asText)
-    val escape = if (isNull(node, "escape")) None else Some(node.get("escape").asText)
-    val write =
-      if (isNull(node, "write")) None
-      else Some(WriteMode.fromString(node.get("write").asText))
-    val partition =
-      if (isNull(node, "partition")) None
-      else
-        Some(
-          new PartitionDeserializer().deserialize(node.get("partition"))
-        )
-    val index =
-      if (isNull(node, "index")) None else Some(IndexSink.fromString(node.get("index").asText))
-    val mapping: Option[Map[String, String]] =
-      if (isNull(node, "properties"))
-        None
-      else {
-        val mappingField = node.get("properties")
-        import scala.collection.JavaConverters._
-        val fields = mappingField
-          .fieldNames()
-          .asScala
-          .map { fieldName =>
-            (fieldName, mappingField.get(fieldName).asText())
-        } toMap
-
-        Some(fields)
-      }
-    Metadata(
-      mode,
-      format,
-      encoding,
-      multiline,
-      array,
-      withHeader,
-      separator,
-      quote,
-      escape,
-      write,
-      partition,
-      index,
-      mapping
-    )
-  }
 }

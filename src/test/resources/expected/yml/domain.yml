@@ -1,6 +1,6 @@
 ---
 name: "DOMAIN"
-directory: "/tmp/incoming/DOMAIN"
+directory: "__COMET_TEST_ROOT__/incoming/DOMAIN"
 metadata:
   mode: "FILE"
   format: "DSV"
@@ -12,8 +12,6 @@ metadata:
   escape: "\\"
   write: "APPEND"
   partition: []
-  ingestMode: "FILE"
-  writeMode: "APPEND"
 schemas:
 - name: "User"
   pattern: "SCHEMA-.*.dsv"
@@ -53,8 +51,6 @@ schemas:
     escape: "\\"
     write: null
     partition: []
-    ingestMode: "FILE"
-    writeMode: "APPEND"
   merge: null
   comment: "Schema Comment"
   presql:

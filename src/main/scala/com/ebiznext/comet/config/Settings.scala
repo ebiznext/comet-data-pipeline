@@ -32,7 +32,6 @@ import com.ebiznext.comet.schema.handlers.{
   SchemaHandler,
   SimpleLauncher
 }
-import com.ebiznext.comet.schema.model.IndexSink
 import com.ebiznext.comet.utils.{CometJacksonModule, CometObjectMapper}
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -94,14 +93,14 @@ object Settings extends StrictLogging {
     path: String,
     discreteMaxCardinality: Int,
     active: Boolean,
-    index: IndexSinkSettings
+    index: IndexSink
   )
 
   final case class Audit(
-    path: String,
-    active: Boolean,
-    index: IndexSinkSettings,
-    maxErrors: Int
+                          path: String,
+                          active: Boolean,
+                          index: IndexSink,
+                          maxErrors: Int
   )
 
   /**

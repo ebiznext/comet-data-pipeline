@@ -305,10 +305,9 @@ class SchemaHandlerSpec extends TestHelper {
           |withHeader: false
           |encoding: ISO-8859-1
           |format: POSITION
-          |index: BQ
+          |index:
+          |  type: None
           |write: OVERWRITE
-          |mapping:
-          |  timestamp: _PARTITIONTIME
           |""".stripMargin
       val metadata = sch.mapper.readValue(content, classOf[Metadata])
       println(metadata)

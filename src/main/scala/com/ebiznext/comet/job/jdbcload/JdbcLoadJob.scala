@@ -1,7 +1,7 @@
 package com.ebiznext.comet.job.jdbcload
 
 import com.ebiznext.comet.config.Settings
-import com.ebiznext.comet.config.IndexSinkSettings
+import com.ebiznext.comet.config.IndexSink
 import com.ebiznext.comet.utils.{SparkJob, Utils}
 import com.google.cloud.bigquery.JobInfo.WriteDisposition
 import org.apache.spark.sql.{SaveMode, SparkSession}
@@ -55,10 +55,10 @@ class JdbcLoadJob(
     */
   override def run(): Try[SparkSession] = {
     val res = settings.comet.audit.index match {
-      case _: IndexSinkSettings.Jdbc if settings.comet.audit.active =>
+      case _: IndexSink.Jdbc if settings.comet.audit.active =>
         runJDBC()
 
-      case _: IndexSinkSettings.Jdbc =>
+      case _: IndexSink.Jdbc =>
         logger.info("JDBC Audit selected, but audit is inactive — no output")
         Success(session)
 

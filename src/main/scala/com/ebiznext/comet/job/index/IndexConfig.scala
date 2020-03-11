@@ -34,6 +34,7 @@ case class IndexConfig(
   schema: String = "",
   format: String = "",
   dataset: Option[Path] = None,
+  indexName: Option[String] = None,
   conf: Map[String, String] = Map()
 ) {
 
@@ -43,7 +44,7 @@ case class IndexConfig(
     }
   }
 
-  def getIndexName(): String = s"${domain}_$schema"
+  def getIndexName(): String = indexName.getOrElse(s"${domain}_$schema")
 
   def getTypeName(): String = s"${domain}_$schema"
 
