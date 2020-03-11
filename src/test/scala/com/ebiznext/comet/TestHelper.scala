@@ -110,12 +110,17 @@ trait TestHelper extends AnyFlatSpec with Matchers with BeforeAndAfterAll with S
 
   def readFileContent(path: Path): String = readFileContent(path.toUri.getPath)
 
-  /** substitution patterns for test sample file resources.
-    *
+
+  /**
+    * Additional substitution patterns that are specific to a given test
+    * @return
     */
-  private val testResourceSubstitutionEngine = TextSubstitutionEngine(
-    "COMET_TEST_ROOT" -> cometTestRoot
-  )
+  def resourceSubstitutionPatterns: Seq[(String, String)] =
+    ("COMET_TEST_ROOT" -> cometTestRoot) :: Nil
+
+  /** substitution patterns for test sample file resources.
+    */
+  private lazy val testResourceSubstitutionEngine = TextSubstitutionEngine(resourceSubstitutionPatterns:_*)
 
   def applyTestFileSubstitutions(fileContent: String): String = {
     testResourceSubstitutionEngine.apply(fileContent)
