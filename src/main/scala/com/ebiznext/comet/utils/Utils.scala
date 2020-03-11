@@ -78,18 +78,20 @@ object Utils {
     * @tparam T
     * @return the original [[attempt]] with no alteration (everything happens as a side effect)
     */
-  def logFailure[T](attempt: Try[T], logger: Logger): Try[T] =
+  def logWhenFailure[T](attempt: Try[T], logger: Logger, message: String = ""): Try[T] =
     attempt match {
       case success @ Success(_) =>
         success
 
       case failure @ Failure(exception) =>
-        logException(logger, exception)
+        logException(logger, exception, message)
         failure
     }
 
-  def logException(logger: Logger, exception: Throwable) = {
-    logger.error(exceptionAsString(exception).toString)
+  def logException(logger: Logger, exception: Throwable, message: String = "") = {
+    logger.error(
+      message + (if (message.nonEmpty) " " else "") + exceptionAsString(exception).toString
+    )
   }
 
   def exceptionAsString(exception: Throwable): String = {

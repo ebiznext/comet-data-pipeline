@@ -25,8 +25,4 @@ package com.ebiznext.comet.schema.model
   * @param sampling : 0.0 means no sampling, > 0  && < 1 means sample dataset, >=1 absolute number of partitions.
   * @param attributes : Attributes used to partition de dataset.
   */
-case class Partition(
-  sampling: Double = 0.0,
-  attributes: List[String]) {
-
-}
+case class Partition(sampling: Double = 0.0, attributes: List[String]) {}

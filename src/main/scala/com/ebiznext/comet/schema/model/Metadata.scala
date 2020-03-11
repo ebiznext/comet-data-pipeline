@@ -51,22 +51,25 @@ import scala.language.postfixOps
   * @param index      : should the dataset be indexed in elasticsearch after ingestion ?
   *
   */
-@JsonIgnoreProperties(Array( /* Can ignore old properties for backcompat of domain files: */ /*"dateFormat", "timestampFormat" */))
+@JsonIgnoreProperties(
+  Array( /* Can ignore old properties for backcompat of domain files: */ /*"dateFormat", "timestampFormat" */
+  )
+)
 case class Metadata(
-                     mode: Option[Mode] = None,
-                     format: Option[Format] = None,
-                     encoding: Option[String] = None,
-                     multiline: Option[Boolean] = None,
-                     array: Option[Boolean] = None,
-                     withHeader: Option[Boolean] = None,
-                     separator: Option[String] = None,
-                     quote: Option[String] = None,
-                     escape: Option[String] = None,
-                     write: Option[WriteMode] = None,
-                     partition: Option[Partition] = None,
-                     index: Option[IndexSink] = None,
-                     properties: Option[Map[String, String]] = None
-                   ) {
+  mode: Option[Mode] = None,
+  format: Option[Format] = None,
+  encoding: Option[String] = None,
+  multiline: Option[Boolean] = None,
+  array: Option[Boolean] = None,
+  withHeader: Option[Boolean] = None,
+  separator: Option[String] = None,
+  quote: Option[String] = None,
+  escape: Option[String] = None,
+  write: Option[WriteMode] = None,
+  partition: Option[Partition] = None,
+  index: Option[IndexSink] = None,
+  properties: Option[Map[String, String]] = None
+) {
   override def toString: String =
     s"""
        |mode:${getIngestMode()}

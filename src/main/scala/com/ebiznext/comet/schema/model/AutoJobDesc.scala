@@ -34,16 +34,16 @@ import org.apache.hadoop.fs.Path
   * @param area   Target Area where domain / dataset will be stored
   */
 case class AutoTaskDesc(
-                         sql: String,
-                         domain: String,
-                         dataset: String,
-                         write: WriteMode,
-                         partition: Option[List[String]] = None,
-                         presql: Option[List[String]] = None,
-                         postsql: Option[List[String]] = None,
-                         area: Option[StorageArea] = None,
-                         index: Option[IndexSink] = None,
-                         properties: Option[Map[String, String]] = None
+  sql: String,
+  domain: String,
+  dataset: String,
+  write: WriteMode,
+  partition: Option[List[String]] = None,
+  presql: Option[List[String]] = None,
+  postsql: Option[List[String]] = None,
+  area: Option[StorageArea] = None,
+  index: Option[IndexSink] = None,
+  properties: Option[Map[String, String]] = None
 ) {
 
   @JsonIgnore

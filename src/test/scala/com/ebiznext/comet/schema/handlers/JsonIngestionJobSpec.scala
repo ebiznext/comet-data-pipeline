@@ -41,12 +41,14 @@ abstract class JsonIngestionJobSpecBase(variant: String) extends TestHelper with
 
   def configuration: Config
 
+  def sourceDomainPathName: String = "/sample/json/json.yml"
+
   ("Ingest Complex JSON " + variant) should ("should be ingested from pending to accepted, and archived ") in {
     new WithSettings(configuration) {
 
       new SpecTrait(
         domainFilename = "json.yml",
-        sourceDomainPathname = "/sample/json/json.yml",
+        sourceDomainPathname = sourceDomainPathName,
         datasetDomainName = "json",
         sourceDatasetPathName = "/sample/json/complex.json"
       ) {
@@ -143,13 +145,12 @@ class JsonIngestionJobSpecNoIndexJdbcMetricsJdbcAuditSpec
     Nil /* TODO: should we not get some here? At least we go to JDBC fine, as far as the schema is concerned. */
 }
 
-
 class JsonIngestionJobSpecJdbcIndexJdbcNoMetricsNoAuditSpec
-  extends JsonIngestionJobSpecBase("Jdbc Index, No Metrics, No Audit") {
+    extends JsonIngestionJobSpecBase("Jdbc Index, No Metrics, No Audit") {
 
   override def configuration: Config =
     ConfigFactory
-      .parseString("""
+      .parseString(("""
                      |metrics {
                      |  active = false
                      |  index {
@@ -163,8 +164,22 @@ class JsonIngestionJobSpecJdbcIndexJdbcNoMetricsNoAuditSpec
                      |    type = "None"
                      |  }
                      |}
-                     |""".stripMargin)
+                     |
+                     |jdbc-engines.h2.tables.sample_json {
+                     |  name="SAMPLE_JSON"
+                     |  create-sql=""" + "\"\"\"" + """
+                     |      CREATE TABLE IF NOT EXISTS SAMPLE_JSON(
+                     |          email varchar(255),
+                     |          nullattr varchar(255),
+                     |          structattr varchar, -- JSON --
+                     |          textattr varchar(255)
+                     |          )
+                     |  """ + "\"\"\"" + """
+                     |}
+                     |""").stripMargin)
       .withFallback(super.testConfiguration)
+
+  override def sourceDomainPathName: String = "/sample/json/json-jdbc.yml"
 
   override def expectedAuditLogs(implicit settings: Settings): List[AuditLog] =
     Nil
@@ -174,4 +189,10 @@ class JsonIngestionJobSpecJdbcIndexJdbcNoMetricsNoAuditSpec
 
   override def expectedMetricRecords(implicit settings: Settings): List[MetricRecord] =
     Nil
+
+  /* FIXME: gotta test that we did receive this:
+
+INSERT INTO SAMPLE_JSON (\"EMAIL\",\"NULLATTR\",\"STRUCTATTR\",\"TEXTATTR\") VALUES (?,?,?,?) {1: 'Hello', 2: NULL, 3: '{\"arrayOfInt\":[1,2,3],\"arrayOfString\":[\"strval1\",\"strval2\",null],\"decimalAttr\":3.225637256372,\"doubleAttr\":1.2,\"intAttr\":1}', 4: 'Hello'};
+
+ */
 }

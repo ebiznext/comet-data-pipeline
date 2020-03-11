@@ -97,10 +97,10 @@ object Settings extends StrictLogging {
   )
 
   final case class Audit(
-                          path: String,
-                          active: Boolean,
-                          index: IndexSink,
-                          maxErrors: Int
+    path: String,
+    active: Boolean,
+    index: IndexSink,
+    maxErrors: Int
   )
 
   /**

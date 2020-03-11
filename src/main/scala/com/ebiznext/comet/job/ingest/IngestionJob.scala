@@ -127,7 +127,8 @@ trait IngestionJob extends SparkJob {
   def index(mergedDF: DataFrame): Unit = {
     val meta = schema.mergedMetadata(domain.metadata)
     meta.getIndexSink() match {
-      case Some(IndexSink.ElasticSearch(indexNameOverride)) if settings.comet.elasticsearch.active =>
+      case Some(IndexSink.ElasticSearch(indexNameOverride))
+          if settings.comet.elasticsearch.active =>
         val properties = meta.properties
         val config = IndexConfig(
           timestamp = properties.flatMap(_.get("timestamp")),
@@ -137,7 +138,9 @@ trait IngestionJob extends SparkJob {
           domain = domain.name,
           schema = schema.name
         )
-        new IndexJob(config, storageHandler, schemaHandler).run()
+        val res = new IndexJob(config, storageHandler, schemaHandler).run()
+        Utils.logWhenFailure(res, logger, "ES Index Failed").get
+
       case Some(IndexSink.BigQuery(bqDataset)) =>
         val (createDisposition: String, writeDisposition: String) = Utils.getDBDisposition(
           meta.getWriteMode()
@@ -154,10 +157,7 @@ trait IngestionJob extends SparkJob {
           days = meta.getProperties().get("days").map(_.toInt)
         )
         val res = new BigQueryLoadJob(config, Some(schema.bqSchema(schemaHandler))).run()
-        res match {
-          case Success(_) => ;
-          case Failure(e) => logger.error("BQLoad Failed", e)
-        }
+        Utils.logWhenFailure(res, logger, "BQLoad Failed").get
 
       case Some(IndexSink.Jdbc(jdbcName, partitions, batchSize)) =>
         val (createDisposition: CreateDisposition, writeDisposition: WriteDisposition) = {
@@ -168,22 +168,19 @@ trait IngestionJob extends SparkJob {
           (CreateDisposition.valueOf(cd), WriteDisposition.valueOf(wd))
         }
 
-          val jdbcConfig = JdbcLoadConfig.fromComet(
-            jdbcName,
-            settings.comet,
-            Right(mergedDF),
-            outputTable = schema.name,
-            createDisposition = createDisposition,
-            writeDisposition = writeDisposition,
-            partitions = partitions,
-            batchSize = batchSize
-          )
+        val jdbcConfig = JdbcLoadConfig.fromComet(
+          jdbcName,
+          settings.comet,
+          Right(mergedDF),
+          outputTable = schema.name,
+          createDisposition = createDisposition,
+          writeDisposition = writeDisposition,
+          partitions = partitions,
+          batchSize = batchSize
+        )
 
-          val res = new JdbcLoadJob(jdbcConfig).run()
-          res match {
-            case Success(_) => ;
-            case Failure(e) => logger.error("JDBCLoad Failed", e)
-          }
+        val res = new JdbcLoadJob(jdbcConfig).run()
+        Utils.logWhenFailure(res, logger, "JDBC Load Failed").get
 
       case Some(IndexSink.None()) | None =>
         // ignore

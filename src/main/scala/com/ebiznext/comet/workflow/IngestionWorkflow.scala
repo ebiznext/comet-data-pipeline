@@ -381,7 +381,8 @@ class IngestionWorkflow(
       action.run() match {
         case Success(_) =>
           task.index match {
-            case Some(IndexSink.ElasticSearch(overrideIndexName)) if settings.comet.elasticsearch.active =>
+            case Some(IndexSink.ElasticSearch(overrideIndexName))
+                if settings.comet.elasticsearch.active =>
               index(job, task)
             case Some(IndexSink.BigQuery(bqDataset)) =>
               val (createDisposition, writeDisposition) = Utils.getDBDisposition(task.write)
@@ -399,6 +400,23 @@ class IngestionWorkflow(
                 )
               ).get
 
+            case Some(IndexSink.Jdbc(jdbcConnection, partitions, batchSize)) =>
+              val (createDisposition, writeDisposition) = Utils.getDBDisposition(task.write)
+              jdbcload(
+                JdbcLoadConfig.fromComet(
+                  jdbcConnection,
+                  comet = settings.comet,
+                  sourceFile = Left(task.getTargetPath(job.getArea()).toString),
+                  outputTable = task.dataset,
+                  createDisposition = CreateDisposition.valueOf(createDisposition),
+                  writeDisposition = WriteDisposition.valueOf(writeDisposition),
+                  partitions = partitions,
+                  batchSize = batchSize
+                )
+              ).get
+
+            case Some(IndexSink.None()) =>
+            // Nop / ignore. No need to index at all.
           }
         case Failure(exception) =>
           exception.printStackTrace()

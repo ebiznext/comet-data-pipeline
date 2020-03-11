@@ -12,22 +12,22 @@ import configs.Configs
   * The default Index Sink is None, but additional types exists (such as BigQuery or Jdbc)
   *
   */
-sealed abstract class IndexSink(/*val*/ `type`: String) { }
+sealed abstract class IndexSink( /*val*/ `type`: String) {}
 
 object IndexSink {
-  @JsonTypeInfo(
-    use = JsonTypeInfo.Id.NAME,
-    include = JsonTypeInfo.As.PROPERTY,
-    property = "type")
-  @JsonSubTypes(Array(
-    /* it's a bit sad we need to repeat the ADT here for Jackson's benefit, but on the other hand
+
+  @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.PROPERTY, property = "type")
+  @JsonSubTypes(
+    Array(
+      /* it's a bit sad we need to repeat the ADT here for Jackson's benefit, but on the other hand
        we decide *here* how we expose Scala's type system to users who're going to fill in configuration files
-     */
-    new JsonSubTypes.Type(value = classOf[None], name = "None"),
-    new JsonSubTypes.Type(value = classOf[ElasticSearch], name = "ElasticSearch"),
-    new JsonSubTypes.Type(value = classOf[BigQuery], name = "BigQuery"),
-    new JsonSubTypes.Type(value = classOf[Jdbc], name = "Jdbc")
-  ))
+       */
+      new JsonSubTypes.Type(value = classOf[None], name = "None"),
+      new JsonSubTypes.Type(value = classOf[ElasticSearch], name = "ElasticSearch"),
+      new JsonSubTypes.Type(value = classOf[BigQuery], name = "BigQuery"),
+      new JsonSubTypes.Type(value = classOf[Jdbc], name = "Jdbc")
+    )
+  )
   abstract class JacksonDummy
 
   /* We need to detach the annotations from IndexSinkSettings to put them on the JacksonDummy as we cannot
@@ -43,39 +43,35 @@ object IndexSink {
     */
 //   @JsonDeserialize(builder = classOf[None.NoneBuilder])
   case class None()
-    extends IndexSink("None")
+      extends IndexSink("None")
       // with CometJacksonModule.JacksonProtectedSingleton
       {
-        /* Note: this is semantically a case object; but due to the combination of Jackson's lack of ability
+    /* Note: this is semantically a case object; but due to the combination of Jackson's lack of ability
         to deal with scala case objects (workaround possible, in this code base) and the eleven-year-old-and-counting
          scala bug https://github.com/scala/bug/issues/2453, it is easier to just dodge it and swallow a couple extra
          instances
-         */
-   //  class NoneBuilder extends CometJacksonModule.ProtectedSingletonBuilder[None.type]
+     */
+    //  class NoneBuilder extends CometJacksonModule.ProtectedSingletonBuilder[None.type]
   }
 
   /**
     * Describes an Index Output delivering values into a BigQuery dataset
     */
-  final case class BigQuery(bqDataset: String = "") extends IndexSink("BigQuery") {
-  }
+  final case class BigQuery(bqDataset: String = "") extends IndexSink("BigQuery") {}
 
   /**
     * Describes an Index Output delivering values into a JDBC-accessible SQL database
     */
   final case class Jdbc(jdbcConnection: String, partitions: Int = 1, batchSize: Int = 1000)
-    extends IndexSink("Jdbc") {
-  }
+      extends IndexSink("Jdbc") {}
 
   /**
     * Describes an Index Output delivering values into an ElasticSearch index
     */
-  final case class ElasticSearch(indexName: Option[String]) extends IndexSink("ElasticSearch") {
-  }
+  final case class ElasticSearch(indexName: Option[String]) extends IndexSink("ElasticSearch") {}
 
   // TODO: Maybe later; additional sink types (e.g. Kafka/Pulsar)?
 
   implicit val indexSinkSettingsConfigs: Configs[IndexSink] =
     Configs.derive[IndexSink]
 }
-
