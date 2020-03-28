@@ -137,12 +137,12 @@ val writeNextVersion =
 
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
-  case x => MergeStrategy.first
+  case x                             => MergeStrategy.first
 }
 
 assemblyExcludedJars in assembly := {
   val cp: Classpath = (fullClasspath in assembly).value
-  cp.foreach(x => println("->"+x.data.getName))
+  cp.foreach(x => println("->" + x.data.getName))
   //cp filter {_.data.getName.matches("hadoop-.*-2.6.5.jar")}
   Nil
 }
@@ -163,10 +163,17 @@ licenses := Seq("APL2" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
 
 // Where is the source code hosted: GitHub or GitLab?
 import xerial.sbt.Sonatype._
-sonatypeProjectHosting := Some(GitHubHosting("ebiznext", "comet-data-pipeline", "hayssam.saleh@ebiznext.com"))
+sonatypeProjectHosting := Some(
+  GitHubHosting("ebiznext", "comet-data-pipeline", "hayssam.saleh@ebiznext.com")
+)
 
 developers := List(
-  Developer(id="hayssams", name="Hayssam Saleh", email="hayssam.saleh@ebiznext.com", url=url("https://www.ebiznext.com"))
+  Developer(
+    id = "hayssams",
+    name = "Hayssam Saleh",
+    email = "hayssam.saleh@ebiznext.com",
+    url = url("https://www.ebiznext.com")
+  )
 )
 
 //logLevel in assembly := Level.Debug
