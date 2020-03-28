@@ -1,9 +1,10 @@
-package com.ebiznext.comet.job.convert
+package com.ebiznext.comet.privacy
+
 
 import com.ebiznext.comet.TestHelper
-import com.ebiznext.comet.privacy.{Email, PrivacyEngine, IPv4, IPv6, Initials, Mask}
+import com.ebiznext.comet.privacy.{Email, IPv4, IPv6, Initials, Mask, PrivacyEngine}
 
-class EncryptionSpec extends TestHelper {
+class PrivacyEngineSpec extends TestHelper {
 
   new WithSettings() {
     "Parsing a single arg encryption algo" should "succeed" in {
