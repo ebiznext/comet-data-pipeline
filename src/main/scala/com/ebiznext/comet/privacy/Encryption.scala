@@ -88,9 +88,11 @@ object IPv6 extends IP {
 trait Approx extends Encryption {
   val rnd = new Random()
   override def encrypt(s: String): String = encrypt(s.toDouble, 100).toString
-  override def encrypt(s: String, params: List[Any]): String =
+  override def encrypt(s: String, params: List[Any]): String = {
     assert(params.length == 1)
-  encrypt(s.toDouble, params.head.asInstanceOf[Int]).toString
+    encrypt(s.toDouble, params.head.asInstanceOf[Int]).toString
+  }
+
 
   def encrypt(value: Double, percent: Int): Double = {
     val rndBool = rnd.nextBoolean()
