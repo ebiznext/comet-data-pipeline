@@ -23,7 +23,7 @@ package com.ebiznext.comet.schema.model
 import java.util.Locale
 
 import com.ebiznext.comet.config.Settings
-import com.ebiznext.comet.utils.Encryption
+import com.ebiznext.comet.privacy.Encryption
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.annotation.{JsonDeserialize, JsonSerialize}
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer
@@ -42,8 +42,14 @@ import scala.reflect.runtime.universe
 sealed case class PrivacyLevel(value: String) {
   override def toString: String = value
 
-  def encrypt(s: String)(implicit settings: Settings): String =
-    PrivacyLevel.ForSettings(settings).all(value)._1.encrypt(s)
+  def encrypt(s: String)(implicit settings: Settings): String = {
+    val (encryptionAlgo, encryptionParams) = PrivacyLevel.ForSettings(settings).all(value)._1
+    if (encryptionParams.isEmpty)
+      encryptionAlgo.encrypt(s)
+    else
+      encryptionAlgo.encrypt(s, encryptionParams)
+
+  }
 
 }
 
@@ -51,16 +57,38 @@ object PrivacyLevel {
 
   case class ForSettings(settings: Settings) {
 
-    private def make(schemeName: String, encryptionObject: String): Encryption = {
+    private def make(schemeName: String, encryptionAlgo: String): (Encryption, List[Any]) = {
+      val hasParam = encryptionAlgo.indexOf('(')
+      val (encryptionObject, encryptionParams) = if (hasParam > 0) {
+        assert(encryptionAlgo.indexOf(')') > hasParam)
+        (
+          encryptionAlgo.substring(0, hasParam),
+          encryptionAlgo.substring(hasParam + 1, encryptionAlgo.length - 1).split(',').toList
+        )
+      } else {
+        (encryptionAlgo, Nil)
+      }
       val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
       val module = runtimeMirror.staticModule(encryptionObject)
       val obj: universe.ModuleMirror = runtimeMirror.reflectModule(module)
       val encryption = obj.instance.asInstanceOf[Encryption]
-      encryption
+      val typedParams = encryptionParams.map { param =>
+        if (param.startsWith("\"") && param.endsWith("\""))
+          param
+        else if (param.startsWith("'") && param.endsWith("'"))
+          param.charAt(0)
+        else if (param.contains('.'))
+          param.toDouble
+        else if (param.equalsIgnoreCase("true") || param.equalsIgnoreCase("false"))
+          param.toBoolean
+        else
+          param.toInt
+      }
+      (encryption, typedParams)
 
     }
 
-    def get(schemeName: String): Encryption = {
+    def get(schemeName: String): (Encryption, List[Any]) = {
       val encryptionObject = settings.comet.privacy.options.asScala(schemeName)
       make(schemeName, encryptionObject)
     }
