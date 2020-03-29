@@ -85,7 +85,7 @@ object IPv6 extends IP {
   override val separator: Char = ':'
 }
 
-trait Approx extends Encryption {
+object Approx extends Encryption {
   val rnd = new Random()
   override def encrypt(s: String): String = encrypt(s.toDouble, 100).toString
   override def encrypt(s: String, params: List[Any]): String = {
