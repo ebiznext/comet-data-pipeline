@@ -113,7 +113,9 @@ case class Type(
               DateTimeFormatter.ofPattern(pattern)
           }
         case PrimitiveType.boolean =>
-          val tf = pattern.split("<-TF->")
+          val separatorTrueFalse = "<-TF->"
+          val start  = pattern.indexOf(separatorTrueFalse)
+          val tf = Array(pattern.substring(0, start), pattern.substring(start+separatorTrueFalse.length))
           assert(tf.size == 2)
           Pattern.compile(tf(0), Pattern.MULTILINE)
           Pattern.compile(tf(1), Pattern.MULTILINE)
