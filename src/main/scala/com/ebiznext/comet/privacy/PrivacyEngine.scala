@@ -5,7 +5,7 @@ import scala.util.Random
 /**
   * Several encryption methods used in privacy management
   */
-object Encryption {
+object PrivacyEngine {
 
   def algo(alg: String, data: String): String = {
     val m = java.security.MessageDigest.getInstance(alg)
@@ -48,55 +48,55 @@ object Encryption {
   }
 }
 
-trait Encryption {
-  def encrypt(s: String): String
-  def encrypt(s: String, params: List[Any]): String = encrypt(s)
+trait PrivacyEngine {
+  def crypt(s: String): String
+  def crypt(s: String, params: List[Any]): String = crypt(s)
 }
 
-object Md5 extends Encryption {
-  def encrypt(s: String): String = Encryption.algo("MD5", s)
+object Md5 extends PrivacyEngine {
+  def crypt(s: String): String = PrivacyEngine.algo("MD5", s)
 }
 
-object Sha1 extends Encryption {
-  def encrypt(s: String): String = Encryption.algo("SHA-1", s)
+object Sha1 extends PrivacyEngine {
+  def crypt(s: String): String = PrivacyEngine.algo("SHA-1", s)
 }
 
-object Sha256 extends Encryption {
-  def encrypt(s: String): String = Encryption.algo("SHA-256", s)
+object Sha256 extends PrivacyEngine {
+  def crypt(s: String): String = PrivacyEngine.algo("SHA-256", s)
 }
 
-object Sha512 extends Encryption {
-  def encrypt(s: String): String = Encryption.algo("SHA-512", s)
+object Sha512 extends PrivacyEngine {
+  def crypt(s: String): String = PrivacyEngine.algo("SHA-512", s)
 }
 
-object Hide extends Encryption {
-  def encrypt(s: String): String = ""
+object Hide extends PrivacyEngine {
+  def crypt(s: String): String = ""
 }
 
-object No extends Encryption {
-  def encrypt(s: String): String = s
+object No extends PrivacyEngine {
+  def crypt(s: String): String = s
 }
 
-object Initials extends Encryption {
+object Initials extends PrivacyEngine {
 
-  def encrypt(s: String): String = {
+  def crypt(s: String): String = {
     s.split("\\s+").map(_.substring(0, 1)).mkString("", ".", ".")
   }
 }
 
-object Email extends Encryption {
-  def encrypt(s: String): String = encrypt(s, List("MD5"))
-  override def encrypt(s: String, params: List[Any]): String = {
+object Email extends PrivacyEngine {
+  def crypt(s: String): String = crypt(s, List("MD5"))
+  override def crypt(s: String, params: List[Any]): String = {
     assert(params.length == 1)
     val split = s.split('@')
-    Encryption.algo(params.head.toString, split(0)) + "@" + split(1)
+    PrivacyEngine.algo(params.head.toString, split(0)) + "@" + split(1)
   }
 }
 
-trait IP extends Encryption {
+trait IP extends PrivacyEngine {
   def separator: Char
-  def encrypt(s: String): String = encrypt(s, 1)
-  override def encrypt(s: String, params: List[Any]): String = {
+  def crypt(s: String): String = encrypt(s, 1)
+  override def crypt(s: String, params: List[Any]): String = {
     assert(params.length == 1)
     encrypt(s, params.head.asInstanceOf[Int])
   }
@@ -115,15 +115,15 @@ object IPv6 extends IP {
   override val separator: Char = ':'
 }
 
-object Approx extends Encryption {
+object Approx extends PrivacyEngine {
   val rnd = new Random()
-  override def encrypt(s: String): String = encrypt(s.toDouble, 100).toString
-  override def encrypt(s: String, params: List[Any]): String = {
+  override def crypt(s: String): String = crypt(s.toDouble, 100).toString
+  override def crypt(s: String, params: List[Any]): String = {
     assert(params.length == 1)
-    encrypt(s.toDouble, params.head.asInstanceOf[Int]).toString
+    crypt(s.toDouble, params.head.asInstanceOf[Int]).toString
   }
 
-  def encrypt(value: Double, percent: Int): Double = {
+  def crypt(value: Double, percent: Int): Double = {
     val rndBool = rnd.nextBoolean()
     val distance = (value * percent * rnd.nextDouble()) / 100
     if (rndBool)
@@ -133,18 +133,18 @@ object Approx extends Encryption {
   }
 }
 
-object Mask extends Encryption {
-  override def encrypt(s: String): String = encrypt(s, 'X', 8, 1, 1)
-  override def encrypt(s: String, params: List[Any]): String = {
+object Mask extends PrivacyEngine {
+  override def crypt(s: String): String = crypt(s, 'X', 8, 1, 1)
+  override def crypt(s: String, params: List[Any]): String = {
     assert(params.length == 4)
     val maskingChar = params(0).asInstanceOf[Char]
     val numberOfChars = params(1).asInstanceOf[Int]
     val leftSide = params(2).asInstanceOf[Int]
     val rightSide = params(3).asInstanceOf[Int]
-    encrypt(s, maskingChar, numberOfChars, leftSide, rightSide)
+    crypt(s, maskingChar, numberOfChars, leftSide, rightSide)
   }
 
-  def encrypt(
+  def crypt(
     s: String,
     maskingChar: Char,
     numberOfChars: Int,

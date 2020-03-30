@@ -23,7 +23,7 @@ package com.ebiznext.comet.schema.model
 import java.util.Locale
 
 import com.ebiznext.comet.config.Settings
-import com.ebiznext.comet.privacy.Encryption
+import com.ebiznext.comet.privacy.PrivacyEngine
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.annotation.{JsonDeserialize, JsonSerialize}
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer
@@ -42,12 +42,12 @@ import scala.reflect.runtime.universe
 sealed case class PrivacyLevel(value: String) {
   override def toString: String = value
 
-  def encrypt(s: String)(implicit settings: Settings): String = {
-    val (encryptionAlgo, encryptionParams) = PrivacyLevel.ForSettings(settings).all(value)._1
-    if (encryptionParams.isEmpty)
-      encryptionAlgo.encrypt(s)
+  def crypt(s: String)(implicit settings: Settings): String = {
+    val (privacyAlgo, privacyParams) = PrivacyLevel.ForSettings(settings).all(value)._1
+    if (privacyParams.isEmpty)
+      privacyAlgo.crypt(s)
     else
-      encryptionAlgo.encrypt(s, encryptionParams)
+      privacyAlgo.crypt(s, privacyParams)
 
   }
 
@@ -56,16 +56,16 @@ sealed case class PrivacyLevel(value: String) {
 object PrivacyLevel {
 
   case class ForSettings(settings: Settings) {
-    private def make(schemeName: String, encryptionAlgo: String): (Encryption, List[Any]) = {
-      val (encryptionObject, typedParams) = Encryption.parse(encryptionAlgo)
+    private def make(schemeName: String, encryptionAlgo: String): (PrivacyEngine, List[Any]) = {
+      val (privacyObject, typedParams) = PrivacyEngine.parse(encryptionAlgo)
       val runtimeMirror = universe.runtimeMirror(getClass.getClassLoader)
-      val module = runtimeMirror.staticModule(encryptionObject)
+      val module = runtimeMirror.staticModule(privacyObject)
       val obj: universe.ModuleMirror = runtimeMirror.reflectModule(module)
-      val encryption = obj.instance.asInstanceOf[Encryption]
+      val encryption = obj.instance.asInstanceOf[PrivacyEngine]
       (encryption, typedParams)
     }
 
-    def get(schemeName: String): (Encryption, List[Any]) = {
+    def get(schemeName: String): (PrivacyEngine, List[Any]) = {
       val encryptionObject = settings.comet.privacy.options.asScala(schemeName)
       make(schemeName, encryptionObject)
     }
