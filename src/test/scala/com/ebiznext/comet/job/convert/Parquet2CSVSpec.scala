@@ -13,7 +13,7 @@ case class Schema(id: String, customer: String, amount: Double, seller_id: Strin
 class Parquet2CSVSpec extends TestHelper {
 
   new WithSettings() {
-    "CreateAttributes" should "create the correct list of attributes for a complex Json" in {
+    "Saving parquet file" should "be read as a csv file correctly" in {
       val rootDir = File.newTemporaryDirectory()
       val outputDir = File(rootDir, "output")
       val domainName = "domain"
