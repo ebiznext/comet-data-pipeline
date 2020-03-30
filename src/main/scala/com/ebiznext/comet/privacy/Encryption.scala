@@ -6,6 +6,7 @@ import scala.util.Random
   * Several encryption methods used in privacy management
   */
 object Encryption {
+
   def algo(alg: String, data: String): String = {
     val m = java.security.MessageDigest.getInstance(alg)
     val b = data.getBytes("UTF-8")
@@ -16,6 +17,34 @@ object Encryption {
       .padTo(32, '0')
       .reverse
       .mkString
+  }
+
+  def parse(maskingAlgo: String): (String, List[Any]) = {
+    def parseParams(params: List[String]): List[Any] =
+      params.map { param =>
+        if (param.startsWith("\"") && param.endsWith("\""))
+          param.substring(1, param.length-1)
+        else if (param.startsWith("'") && param.endsWith("'"))
+          param.charAt(1)
+        else if (param.contains('.'))
+          param.toDouble
+        else if (param.equalsIgnoreCase("true") || param.equalsIgnoreCase("false"))
+          param.toBoolean
+        else
+          param.toInt
+      }
+    val hasParam = maskingAlgo.indexOf('(')
+    if (hasParam > 0) {
+      assert(maskingAlgo.indexOf(')') > hasParam)
+      (
+        maskingAlgo.substring(0, hasParam),
+        parseParams(
+          maskingAlgo.substring(hasParam + 1, maskingAlgo.length - 1).split(',').map(_.trim).toList
+        )
+      )
+    } else {
+      (maskingAlgo, Nil)
+    }
   }
 }
 
@@ -49,8 +78,9 @@ object No extends Encryption {
 }
 
 object Initials extends Encryption {
+
   def encrypt(s: String): String = {
-    s.split("\\s+").map(_.substring(0, 1)).mkString(".")
+    s.split("\\s+").map(_.substring(0, 1)).mkString("", ".", ".")
   }
 }
 
@@ -92,7 +122,6 @@ object Approx extends Encryption {
     assert(params.length == 1)
     encrypt(s.toDouble, params.head.asInstanceOf[Int]).toString
   }
-
 
   def encrypt(value: Double, percent: Int): Double = {
     val rndBool = rnd.nextBoolean()
