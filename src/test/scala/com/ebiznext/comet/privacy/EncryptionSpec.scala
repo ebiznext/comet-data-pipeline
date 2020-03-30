@@ -1,7 +1,7 @@
 package com.ebiznext.comet.job.convert
 
 import com.ebiznext.comet.TestHelper
-import com.ebiznext.comet.privacy.{Encryption, Initials}
+import com.ebiznext.comet.privacy.{Email, Encryption, Initials}
 
 class EncryptionSpec extends TestHelper {
 
@@ -32,6 +32,12 @@ class EncryptionSpec extends TestHelper {
     "Initials Masking Composite name" should "succeed" in {
       val result = Initials.encrypt("John Doe")
       result shouldBe "J.D."
+    }
+
+    "Email Masking" should "succeed" in {
+      val result = Email.encrypt("john@doe.com")
+      result should have length "527bd5b5d689e2c32ae974c6229ff785@doe.com".length
+      result should endWith ("@doe.com")
     }
 
   }
