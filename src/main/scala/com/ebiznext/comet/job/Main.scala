@@ -127,7 +127,7 @@ object Main extends StrictLogging {
         } else
           workflow.loadPending()
       case "ingest" =>
-        IngestConfig.parse(args.drop(1)) match {
+        IngestConfig.parse(args.tail) match {
           case Some(config) =>
             val lockPath =
               new Path(settings.comet.lock.path, s"${config.domain}_${config.schema}.lock")
@@ -143,7 +143,7 @@ object Main extends StrictLogging {
 
         }
       case "index" =>
-        IndexConfig.parse(args.drop(1)) match {
+        IndexConfig.parse(args.tail) match {
           case Some(config) =>
             // do something
             workflow.index(config)
@@ -152,7 +152,7 @@ object Main extends StrictLogging {
         }
 
       case "atlas" =>
-        AtlasConfig.parse(args.drop(1)) match {
+        AtlasConfig.parse(args.tail) match {
           case Some(config) =>
             // do something
             workflow.atlas(config)
@@ -161,7 +161,7 @@ object Main extends StrictLogging {
         }
 
       case "bqload" =>
-        BigQueryLoadConfig.parse(args.drop(1)) match {
+        BigQueryLoadConfig.parse(args.tail) match {
           case Some(config) =>
             workflow.bqload(config)
           case _ =>
@@ -169,7 +169,7 @@ object Main extends StrictLogging {
         }
 
       case "sqlload" =>
-        JdbcLoadConfig.parse(args.drop(1)) match {
+        JdbcLoadConfig.parse(args.tail) match {
           case Some(config) =>
             workflow.jdbcload(config)
           case _ =>
@@ -177,13 +177,13 @@ object Main extends StrictLogging {
         }
 
       case "infer-schema" => {
-        InferSchemaConfig.parse(args.drop(1)) match {
+        InferSchemaConfig.parse(args.tail) match {
           case Some(config) => workflow.infer(config)
           case _            => println(InferSchemaConfig.usage())
         }
       }
       case "metrics" =>
-        MetricsConfig.parse(args.drop(1)) match {
+        MetricsConfig.parse(args.tail) match {
           case Some(config) =>
             workflow.metric(config)
           case _ =>
@@ -191,7 +191,7 @@ object Main extends StrictLogging {
         }
 
       case "parquet2csv" =>
-        Parquet2CSVConfig.parse(args.drop(1)) match {
+        Parquet2CSVConfig.parse(args.tail) match {
           case Some(config) =>
             new Parquet2CSV(config, storageHandler).run()
           case _ =>
