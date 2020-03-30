@@ -1,7 +1,7 @@
 package com.ebiznext.comet.job.convert
 
 import com.ebiznext.comet.TestHelper
-import com.ebiznext.comet.privacy.{Email, Encryption, Initials}
+import com.ebiznext.comet.privacy.{Email, Encryption, IPv4, IPv6, Initials, Mask}
 
 class EncryptionSpec extends TestHelper {
 
@@ -40,5 +40,29 @@ class EncryptionSpec extends TestHelper {
       result should endWith ("@doe.com")
     }
 
+    "IPv4 Masking" should "succeed" in {
+      val result = IPv4.encrypt("192.168.2.1")
+      result shouldBe "192.168.2.0"
+    }
+
+    "IPv4 Masking Multti group" should "succeed" in {
+      val result = IPv4.encrypt("192.168.2.1", 2)
+      result shouldBe "192.168.0.0"
+    }
+
+    "IPv6 Masking" should "succeed" in {
+      val result = IPv6.encrypt("2001:db8:0:85a3::ac1f:8001")
+      result shouldBe "2001:db8:0:85a3::ac1f:0"
+    }
+
+    "IPv6 Masking multi group" should "succeed" in {
+      val result = IPv6.encrypt("2001:db8:0:85a3::ac1f:8001", 3)
+      result shouldBe "2001:db8:0:85a3:0:0:0"
+    }
+
+    "Generic Masking" should "succeed" in {
+      val result = Mask.encrypt("+3360102030405", '*', 8, 4, 2)
+      result shouldBe "+336********05"
+    }
   }
 }
