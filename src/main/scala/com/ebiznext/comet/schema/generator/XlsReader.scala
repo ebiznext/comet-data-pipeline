@@ -156,7 +156,7 @@ class XlsReader(path: String) {
                     case Success(v) => v - 1
                     case _          => 0
                   }
-                  Some(Position(positionStart, positionEnd))
+                  Some(Position(positionStart, positionEnd, "none"))
                 }
                 case _ => None
               }
