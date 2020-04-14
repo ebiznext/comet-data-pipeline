@@ -91,7 +91,7 @@ class SchemaSpec extends TestHelper {
       val yml = loadFile(s"/expected/yml/position_serialization_${versionSuffix}.yml")
 
       val attr =
-        Attribute("hello", position = Some(Position(1, 2, "none")))
+        Attribute("hello", position = Some(Position(1, 2, Trim.NONE)))
       val writer = new StringWriter()
       mapper.writer().writeValue(writer, attr)
       logger.info("--" + writer.toString + "--")

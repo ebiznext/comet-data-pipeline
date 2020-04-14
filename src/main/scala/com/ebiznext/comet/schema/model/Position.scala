@@ -28,4 +28,4 @@ package com.ebiznext.comet.schema.model
   * @param trim : trim left / right / both / none
   *
   */
-case class Position(first: Int, last: Int, trim: String)
+case class Position(first: Int, last: Int, trim: Trim)
