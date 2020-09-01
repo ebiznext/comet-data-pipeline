@@ -21,8 +21,9 @@ object Xls2Yml extends LazyLogging {
     */
   def genPreEncryptionDomain(domain: Domain, privacy: Seq[String]): Domain = {
     val preEncryptSchemas: List[Schema] = domain.schemas.map { s =>
-      val newAtt =
-        s.attributes.map { attr =>
+      val newAttributes =
+        s.attributes.filter(_.script.isEmpty)
+          .map { attr =>
           if (
             privacy == Nil || privacy.contains(
               attr.privacy.getOrElse(PrivacyLevel.None).toString
@@ -32,8 +33,8 @@ object Xls2Yml extends LazyLogging {
           else
             attr.copy(`type` = "string", required = false, privacy = None)
         }
-      val newMetaData: Option[Metadata] = s.metadata.map { m => m.copy(partition = None) }
-      s.copy(attributes = newAtt)
+      val newMetaData: Option[Metadata] = s.metadata.map { m => m.copy(partition = None).copy(sink = None) }
+      s.copy(attributes = newAttributes)
         .copy(metadata = newMetaData)
         .copy(merge = None)
     }
@@ -63,7 +64,8 @@ object Xls2Yml extends LazyLogging {
         metadata.copy(
           format = Some(Format.DSV),
           separator = delimiter.orElse(schema.metadata.flatMap(_.separator)).orElse(Some("µ")),
-          withHeader = schema.metadata.flatMap(_.withHeader)
+          withHeader = schema.metadata.flatMap(_.withHeader),
+          encoding = None
         )
       }
       val attributes = schema.attributes.map { attr =>
@@ -85,7 +87,7 @@ object Xls2Yml extends LazyLogging {
       schema.copy(
         metadata = metadata,
         attributes = attributes,
-        pattern = Pattern.compile(s"${schema.name}.csv")
+        pattern = Pattern.compile(s"${schema.name}.*")
       )
     }
     val postEncryptDomain = domain.copy(schemas = postEncryptSchemas)
