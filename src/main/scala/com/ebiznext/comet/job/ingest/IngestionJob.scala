@@ -210,7 +210,7 @@ trait IngestionJob extends SparkJob {
         .head
       val finalCsvPath = new Path(
         acceptedPath,
-        s"${acceptedPath.getName()}-${now}.csv"
+        s"${acceptedPath.getName()}-${now}${path.headOption.map("-"+_.getName).getOrElse(".csv")}"
       )
       storageHandler.move(csvPath, finalCsvPath)
     }
