@@ -35,7 +35,7 @@ object Xls2Yml extends LazyLogging {
               attr.copy(`type` = "string", required = false, privacy = None)
           }
       val newMetaData: Option[Metadata] = s.metadata.map { m =>
-        m.copy(partition = None).copy(sink = None)
+        m.copy(partition = None, sink = None)
       }
       s.copy(attributes = newAttributes)
         .copy(metadata = newMetaData)
