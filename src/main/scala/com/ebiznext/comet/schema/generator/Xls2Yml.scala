@@ -68,7 +68,7 @@ object Xls2Yml extends LazyLogging {
           format = Some(Format.DSV),
           separator = delimiter.orElse(schema.metadata.flatMap(_.separator)).orElse(Some("µ")),
           withHeader = schema.metadata.flatMap(_.withHeader),
-          encoding = None
+          encoding = Some("UTF-8")
         )
       }
       val attributes = schema.attributes.map { attr =>
