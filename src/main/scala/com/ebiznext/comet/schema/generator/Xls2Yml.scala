@@ -1,7 +1,5 @@
 package com.ebiznext.comet.schema.generator
 
-import java.util.regex.Pattern
-
 import com.ebiznext.comet.config.{DatasetArea, Settings}
 import com.ebiznext.comet.schema.model._
 import com.typesafe.config.ConfigFactory
@@ -89,8 +87,7 @@ object Xls2Yml extends LazyLogging {
       }
       schema.copy(
         metadata = metadata,
-        attributes = attributes,
-        pattern = Pattern.compile(s"${schema.name}.*")
+        attributes = attributes
       )
     }
     val postEncryptDomain = domain.copy(schemas = postEncryptSchemas)

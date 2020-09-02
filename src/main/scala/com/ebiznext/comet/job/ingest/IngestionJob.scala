@@ -1,7 +1,6 @@
 package com.ebiznext.comet.job.ingest
 
 import java.sql.Timestamp
-import java.time.format.DateTimeFormatter
 import java.time.{Instant, LocalDateTime}
 
 import com.ebiznext.comet.config.{DatasetArea, Settings, StorageArea}
@@ -98,8 +97,8 @@ trait IngestionJob extends SparkJob {
       .map(_ => WriteMode.OVERWRITE)
       .getOrElse(metadata.getWrite())
 
-  private def timestampedCsv(): Boolean =
-    settings.comet.timestampedCsv && !settings.comet.grouped && metadata.partition.isEmpty
+  private def csvOutput(): Boolean =
+    settings.comet.csvOutput && !settings.comet.grouped && metadata.partition.isEmpty && path.nonEmpty
 
   /**
     * Merge new and existing dataset if required
@@ -124,23 +123,23 @@ trait IngestionJob extends SparkJob {
 
                                         schema.attributes.foldRight(acceptedDF) {
                                           case (
-                                              Attribute(
-                                                name,
-                                                _,
-                                                _,
-                                                _,
-                                                _,
-                                                _,
-                                                _,
-                                                _,
-                                                _,
-                                                _,
-                                                _,
-                                                _,
-                                                _,
-                                                Some(script)
-                                              ),
-                                              df
+                                                Attribute(
+                                                  name,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  Some(script)
+                                                ),
+                                                df
                                               ) =>
                                             df.T(
                                               s"SELECT *, $script as $name FROM __THIS__"
@@ -205,16 +204,14 @@ trait IngestionJob extends SparkJob {
       saveRows(mergedDF, acceptedPath, writeMode, StorageArea.accepted, schema.merge.isDefined)
     logger.info("Saved Dataset Schema")
     savedDataset.printSchema()
-    if (timestampedCsv()) {
-      val formatter = DateTimeFormatter.ofPattern("yyyyMMddHHmmss")
-      val now = LocalDateTime.now().format(formatter)
+    if (csvOutput()) {
       val csvPath = storageHandler
         .list(acceptedPath, ".csv", LocalDateTime.MIN)
-        .filter(!_.getName.startsWith(acceptedPath.getName()))
+        .filterNot(path => schema.pattern.matcher(path.getName).matches())
         .head
       val finalCsvPath = new Path(
         acceptedPath,
-        s"${acceptedPath.getName()}-${now}${path.headOption.map("-" + _.getName).getOrElse(".csv")}"
+        path.head.getName
       )
       storageHandler.move(csvPath, finalCsvPath)
     }
@@ -397,7 +394,7 @@ trait IngestionJob extends SparkJob {
 
       val nbPartitions = metadata.getSamplingStrategy() match {
         case 0.0 => // default partitioning
-          if (timestampedCsv())
+          if (csvOutput())
             1
           else
             dataset.rdd.getNumPartitions
@@ -458,7 +455,7 @@ trait IngestionJob extends SparkJob {
       } else
         (partitionedDFWriter, dataset)
       val finalTargetDatasetWriter =
-        if (timestampedCsv())
+        if (csvOutput())
           targetDatasetWriter
             .mode(saveMode)
             .format("csv")
