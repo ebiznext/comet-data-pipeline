@@ -59,7 +59,7 @@ class DsvIngestionJob(
     * @return Spark Job name
     */
   override def name: String =
-    s"""${domain.name}-${schema.name}-${path.map(_.getName).mkString(",")}"""
+    s"""${domain.name}-${schema.name}-${path.headOption.map(_.getName).mkString(",")}"""
 
   /**
     * dataset Header names as defined by the schema
