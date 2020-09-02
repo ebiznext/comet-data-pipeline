@@ -22,18 +22,21 @@ object Xls2Yml extends LazyLogging {
   def genPreEncryptionDomain(domain: Domain, privacy: Seq[String]): Domain = {
     val preEncryptSchemas: List[Schema] = domain.schemas.map { s =>
       val newAttributes =
-        s.attributes.filter(_.script.isEmpty)
+        s.attributes
+          .filter(_.script.isEmpty)
           .map { attr =>
-          if (
-            privacy == Nil || privacy.contains(
-              attr.privacy.getOrElse(PrivacyLevel.None).toString
+            if (
+              privacy == Nil || privacy.contains(
+                attr.privacy.getOrElse(PrivacyLevel.None).toString
+              )
             )
-          )
-            attr.copy(`type` = "string", required = false)
-          else
-            attr.copy(`type` = "string", required = false, privacy = None)
-        }
-      val newMetaData: Option[Metadata] = s.metadata.map { m => m.copy(partition = None).copy(sink = None) }
+              attr.copy(`type` = "string", required = false)
+            else
+              attr.copy(`type` = "string", required = false, privacy = None)
+          }
+      val newMetaData: Option[Metadata] = s.metadata.map { m =>
+        m.copy(partition = None).copy(sink = None)
+      }
       s.copy(attributes = newAttributes)
         .copy(metadata = newMetaData)
         .copy(merge = None)

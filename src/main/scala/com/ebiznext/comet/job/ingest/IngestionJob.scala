@@ -159,15 +159,17 @@ trait IngestionJob extends SparkJob {
             .map { table =>
               val bqTable = s"${domain.name}.${schema.name}"
               val existingBigQueryDF = session.read
-              // We provided the acceptedDF schema here since BQ lose the required / nullable information of the schema
+                // We provided the acceptedDF schema here since BQ lose the required / nullable information of the schema
                 .schema(acceptedDfWithscriptFields.schema)
                 .format("com.google.cloud.spark.bigquery")
                 .load(bqTable)
-              if (existingBigQueryDF.schema.fields.length == session.read
-                    .parquet(acceptedPath.toString)
-                    .schema
-                    .fields
-                    .length)
+              if (
+                existingBigQueryDF.schema.fields.length == session.read
+                  .parquet(acceptedPath.toString)
+                  .schema
+                  .fields
+                  .length
+              )
                 merge(acceptedDfWithscriptFields, existingBigQueryDF, mergeOptions)
               else
                 throw new RuntimeException(
@@ -180,11 +182,13 @@ trait IngestionJob extends SparkJob {
           // We provide the accepted DF schema since partition columns types are infered when parquet is loaded and might not match with the DF being ingested
           val existingDF =
             session.read.schema(acceptedDfWithscriptFields.schema).parquet(acceptedPath.toString)
-          if (existingDF.schema.fields.length == session.read
-                .parquet(acceptedPath.toString)
-                .schema
-                .fields
-                .length)
+          if (
+            existingDF.schema.fields.length == session.read
+              .parquet(acceptedPath.toString)
+              .schema
+              .fields
+              .length
+          )
             merge(acceptedDfWithscriptFields, existingDF, mergeOptions)
           else
             throw new RuntimeException(
@@ -210,7 +214,7 @@ trait IngestionJob extends SparkJob {
         .head
       val finalCsvPath = new Path(
         acceptedPath,
-        s"${acceptedPath.getName()}-${now}${path.headOption.map("-"+_.getName).getOrElse(".csv")}"
+        s"${acceptedPath.getName()}-${now}${path.headOption.map("-" + _.getName).getOrElse(".csv")}"
       )
       storageHandler.move(csvPath, finalCsvPath)
     }
