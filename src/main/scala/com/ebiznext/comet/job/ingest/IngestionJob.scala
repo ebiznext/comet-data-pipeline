@@ -86,7 +86,7 @@ trait IngestionJob extends SparkJob {
     val schemaName = schema.name
     IngestionUtil.sinkRejected(session, rejectedRDD, domainName, schemaName, now) match {
       case Success((rejectedDF, rejectedPath)) =>
-        saveRows(rejectedDF, rejectedPath, WriteMode.APPEND, StorageArea.rejected, merge = false)
+        sinkToFile(rejectedDF, rejectedPath, WriteMode.APPEND, StorageArea.rejected, merge = false)
         Success(rejectedPath)
       case Failure(exception) =>
         logger.error("Failed to save Rejected", exception)
@@ -178,16 +178,16 @@ trait IngestionJob extends SparkJob {
     logger.info("Merged Dataframe Schema")
     mergedDF.printSchema()
     val savedDataset =
-      saveRows(mergedDF, acceptedPath, writeMode, StorageArea.accepted, schema.merge.isDefined)
+      sinkToFile(mergedDF, acceptedPath, writeMode, StorageArea.accepted, schema.merge.isDefined)
     logger.info("Saved Dataset Schema")
     savedDataset.printSchema()
+    sink(mergedDF)
 
     if (settings.comet.metrics.active) {
       new MetricsJob(this.domain, this.schema, Stage.GLOBAL, storageHandler, schemaHandler)
         .run()
         .get
     }
-    sink(savedDataset)
     (savedDataset, acceptedPath)
   }
 
@@ -278,7 +278,7 @@ trait IngestionJob extends SparkJob {
     * @param writeMode  : Append or overwrite
     * @param area       : accepted or rejected area
     */
-  private[this] def saveRows(
+  private[this] def sinkToFile(
     dataset: DataFrame,
     targetPath: Path,
     writeMode: WriteMode,
