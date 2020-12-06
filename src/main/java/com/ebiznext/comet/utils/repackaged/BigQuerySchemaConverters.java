@@ -261,7 +261,9 @@ public class BigQuerySchemaConverters {
     protected static Field createBigQueryColumn(StructField sparkField, int depth) {
         DataType sparkType = sparkField.dataType();
         String fieldName = sparkField.name();
+        System.out.println("field name +++++ " + fieldName);
         Field.Mode fieldMode = (sparkField.nullable()) ? Field.Mode.NULLABLE : Field.Mode.REQUIRED;
+        System.out.println("field mode ++++++ " + fieldMode.name());
         String description;
         FieldList subFields = null;
         LegacySQLTypeName fieldType;

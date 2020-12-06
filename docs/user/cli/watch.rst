@@ -28,6 +28,11 @@ Options
     *Optional*. Domains not to watch
 
 
+.. option:: --schema: schema1
+
+    *Optional*. Schema to watch
+
+
 .. option:: --options: k1=v1,k2=v2...
 
     *Optional*. Watch arguments to be used as substitutions

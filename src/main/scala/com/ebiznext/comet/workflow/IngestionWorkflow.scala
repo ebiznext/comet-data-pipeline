@@ -168,7 +168,7 @@ class IngestionWorkflow(
 
     val result = includedDomains.flatMap { domain =>
       logger.info(s"Watch Domain: ${domain.name}")
-      val (resolved, unresolved) = pending(domain.name)
+      val (resolved, unresolved) = pending(domain.name, config.schema)
       unresolved.foreach { case (_, path) =>
         val targetPath =
           new Path(DatasetArea.unresolved(domain.name), path.getName)
@@ -235,26 +235,54 @@ class IngestionWorkflow(
     * @return resolved && unresolved schemas / path
     */
   private def pending(
-    domainName: String
+    domainName: String,
+    schemaName: Option[String]
   ): (Iterable[(Option[Schema], Path)], Iterable[(Option[Schema], Path)]) = {
     val pendingArea = DatasetArea.pending(domainName)
     logger.info(s"List files in $pendingArea")
-    val paths = storageHandler.list(pendingArea)
-    logger.info(s"Found ${paths.mkString(",")}")
-    val domain = schemaHandler.getDomain(domainName).toList
-    val schemas: Iterable[(Option[Schema], Path)] =
-      for {
-        domain <- domain
-        schema <- paths.map { path =>
-          (domain.findSchema(path.getName), path) // getName without timestamp
-        }
-      } yield {
+    val files = storageHandler.list(pendingArea)
+    logger.info(s"Found ${files.mkString(",")}")
+    val domain = schemaHandler.getDomain(domainName)
+
+    schemaName match {
+      case Some(name) =>
         logger.info(
-          s"Found Schema ${schema._1.map(_.name).getOrElse("None")} for file ${schema._2}"
+          s"We will only check files that match the schema name: $name for the Domain: $domainName"
         )
-        schema
-      }
-    schemas.partition(_._1.isDefined)
+        val schemas = for {
+          dom <- domain.toList
+          schema <- files.filter(x => predicate(dom, name, x)).map { file =>
+            (dom.findSchema(file.getName), file)
+          }
+        } yield {
+          logger.info(
+            s"Found Schema ${schema._1.map(_.name).getOrElse("None")} for file ${schema._2}"
+          )
+          schema
+        }
+        schemas.partition(_._1.isDefined)
+      case _ =>
+        logger.info(s"We will check all the files for the Domain: $domainName")
+        val schemas = for {
+          dom <- domain.toList
+          schema <- files.map { file =>
+            (dom.findSchema(file.getName), file)
+
+          }
+        } yield {
+          logger.info(
+            s"Found Schema ${schema._1.map(_.name).getOrElse("None")} for file ${schema._2}"
+          )
+          schema
+        }
+        schemas.partition(_._1.isDefined)
+    }
+
+  }
+
+  private[this] def predicate(domain: Domain, schemaName: String, file: Path): Boolean = {
+    val schema = domain.schemas.find(_.name.equals(schemaName))
+    schema.exists(_.pattern.matcher(file.getName).matches())
   }
 
   /** Ingest the file (called by the cron manager at ingestion time for a specific dataset
