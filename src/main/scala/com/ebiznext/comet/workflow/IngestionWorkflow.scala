@@ -242,12 +242,27 @@ class IngestionWorkflow(
     logger.info(s"List files in $pendingArea")
     val files = storageHandler.list(pendingArea)
     logger.info(s"Found ${files.mkString(",")}")
-    val domain = schemaHandler.getDomain(domainName).toList
+    val domain = schemaHandler.getDomain(domainName)
+
+    val filteredFiles = (dom: Domain) =>
+      if (schemasName.nonEmpty) {
+        logger.info(
+          s"We will only watch files that match the schemas name:" +
+          s" $schemasName for the Domain: ${dom.name}"
+        )
+        files.filter(f => predicate(dom, schemasName, f))
+      } else {
+        logger.info(
+          s"We will watch all the files for the Domain:" +
+          s" ${dom.name}"
+        )
+        files
+      }
 
     val schemas = for {
-      domain <- domain
-      schema <- files.filter(f => predicate(domain, schemasName, f)).map { file =>
-        (domain.findSchema(file.getName), file)
+      dom <- domain.toList
+      schema <- filteredFiles(dom).map { file =>
+        (dom.findSchema(file.getName), file)
       }
     } yield {
       logger.info(
@@ -261,15 +276,7 @@ class IngestionWorkflow(
   private[this] def predicate(domain: Domain, schemasName: List[String], file: Path): Boolean = {
     schemasName.exists { schemaName =>
       val schema = domain.schemas.find(_.name.equals(schemaName))
-      val exist = schema.exists(_.pattern.matcher(file.getName).matches())
-      if (exist) {
-        logger.info(
-          s"We will only watch files that match the schemas name: $schemasName for the Domain: ${domain.name}"
-        )
-      } else {
-        logger.info(s"We will watch all the files for the Domain: ${domain.name}")
-      }
-      exist
+      schema.exists(_.pattern.matcher(file.getName).matches())
     }
   }
 
