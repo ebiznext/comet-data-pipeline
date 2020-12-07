@@ -183,7 +183,7 @@ class BigQuerySparkJob(
               .format("com.google.cloud.spark.bigquery")
               .option("datePartition", partitionStr)
               .option("table", bqTable)
-              .option("intermediateFormat", "orc")
+              .option("intermediateFormat", intermediateFormat)
               .save()
           )
         case _ =>
@@ -192,7 +192,7 @@ class BigQuerySparkJob(
             .mode(SaveMode.Append)
             .format("com.google.cloud.spark.bigquery")
             .option("table", bqTable)
-            .option("intermediateFormat", "orc")
+            .option("intermediateFormat", intermediateFormat)
             .save()
       }
 
