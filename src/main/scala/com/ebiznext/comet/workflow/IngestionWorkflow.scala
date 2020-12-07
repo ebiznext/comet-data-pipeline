@@ -242,12 +242,12 @@ class IngestionWorkflow(
     logger.info(s"List files in $pendingArea")
     val files = storageHandler.list(pendingArea)
     logger.info(s"Found ${files.mkString(",")}")
-    val domain = schemaHandler.getDomain(domainName)
+    val domain = schemaHandler.getDomain(domainName).toList
 
     val schemas = for {
-      dom <- domain.toList
-      schema <- files.filter(f => predicate(dom, schemasName, f)).map { file =>
-        (dom.findSchema(file.getName), file)
+      domain <- domain
+      schema <- files.filter(f => predicate(domain, schemasName, f)).map { file =>
+        (domain.findSchema(file.getName), file)
       }
     } yield {
       logger.info(
