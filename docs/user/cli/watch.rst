@@ -28,9 +28,9 @@ Options
     *Optional*. Domains not to watch
 
 
-.. option:: --schema: schema1
+.. option:: --schemas: schema1,schema2,schema3...
 
-    *Optional*. Schema to watch
+    *Optional*. Schemas to watch
 
 
 .. option:: --options: k1=v1,k2=v2...
