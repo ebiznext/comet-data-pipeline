@@ -42,7 +42,7 @@ libraryDependencies ++= {
     System.out.println(s"sparkMajor=$sparkMajor")
     sparkMajor match {
       case "3" =>
-            (spark_3d0_forScala_2d12, jackson312)
+        (spark_3d0_forScala_2d12, jackson312)
       case "2" =>
         CrossVersion.partialVersion(scalaVersion.value) match {
           case Some((2, scalaMinor)) if scalaMinor == 12 => (spark_2d4_forScala_2d12, jackson212)
@@ -111,8 +111,6 @@ releaseProcess := Seq[ReleaseStep](
   setReleaseVersion,
   commitReleaseVersion, // forces to push dirty files
   tagRelease,
-  // releaseStepCommand("+publish"),
-  // releaseStepCommand("universal:publish"), // publish jars and tgz archives in the snapshot or release repository
   releaseStepCommandAndRemaining("+publishSigned"),
   releaseStepCommand("sonatypeBundleRelease"),
   setNextVersion,
@@ -120,13 +118,13 @@ releaseProcess := Seq[ReleaseStep](
   pushChanges
 )
 
-releaseCommitMessage := s"Add Cloud Build ${ReleasePlugin.runtimeVersion.value}"
+releaseCommitMessage := s"Release ${ReleasePlugin.runtimeVersion.value}"
 
 releaseVersionBump := Next
 
 assemblyMergeStrategy in assembly := {
   case PathList("META-INF", xs @ _*) => MergeStrategy.discard
-  case "reference.conf" => MergeStrategy.concat
+  case "reference.conf"              => MergeStrategy.concat
   case x                             => MergeStrategy.first
 }
 
@@ -164,6 +162,48 @@ developers := List(
     id = "hayssams",
     name = "Hayssam Saleh",
     email = "hayssam.saleh@ebiznext.com",
+    url = url("https://www.ebiznext.com")
+  ),
+  Developer(
+    id = "elarib",
+    name = "Abdelhamide Elarib",
+    email = "elarib.abdelhamide@gmal.com",
+    url = url("https://www.ebiznext.com")
+  ),
+  Developer(
+    id = "cchepelov",
+    name = "Cyrille Chepelov",
+    email = "cyrille@chepelov.org",
+    url = url("https://www.ebiznext.com")
+  ),
+  Developer(
+    id = "AmineSagaama",
+    name = "Amine Sagaama",
+    email = "amine.sagaama@gmail.com",
+    url = url("https://www.ebiznext.com")
+  ),
+  Developer(
+    id = "mhdqassir",
+    name = "Mohamad Kassir",
+    email = "mbkassir@gmail.com",
+    url = url("https://www.ebiznext.com")
+  ),
+  Developer(
+    id = "mmenestret",
+    name = "Martin Menestret",
+    email = "martinmenestret@gmail.com",
+    url = url("https://www.ebiznext.com")
+  ),
+  Developer(
+    id = "pchalcol",
+    name = "Patice Chalcol",
+    email = "pchalcol@gmail.com",
+    url = url("https://www.ebiznext.com")
+  ),
+  Developer(
+    id = "zedach",
+    name = "Mourad Dachraoui",
+    email = "morad.dachraoui@gmaiil.com",
     url = url("https://www.ebiznext.com")
   )
 )

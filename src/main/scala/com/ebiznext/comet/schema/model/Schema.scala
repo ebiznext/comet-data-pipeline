@@ -20,14 +20,13 @@
 
 package com.ebiznext.comet.schema.model
 
-import java.util.regex.Pattern
-
 import com.ebiznext.comet.schema.handlers.SchemaHandler
 import com.ebiznext.comet.utils.TextSubstitutionEngine
 import com.ebiznext.comet.utils.conversion.BigQueryUtils
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.spark.sql.types._
 
+import java.util.regex.Pattern
 import scala.collection.mutable
 
 /** How dataset are merged
@@ -70,7 +69,8 @@ case class Schema(
   presql: Option[List[String]],
   postsql: Option[List[String]],
   tags: Option[Set[String]] = None,
-  rls: Option[List[RowLevelSecurity]] = None
+  rls: Option[List[RowLevelSecurity]] = None,
+  assertions: Option[Map[String, String]] = None
 ) {
 
   @JsonIgnore
@@ -96,6 +96,7 @@ case class Schema(
   def sparkType(schemaHandler: SchemaHandler): StructType = {
     val fields = attributes.map { attr =>
       StructField(attr.name, attr.sparkType(schemaHandler), !attr.required)
+        .withComment(attr.comment.getOrElse(""))
     }
     StructType(fields)
   }
@@ -120,6 +121,7 @@ case class Schema(
   ): StructType = {
     val fields = attributes filter p map { attr =>
       StructField(attr.rename.getOrElse(attr.name), attr.sparkType(schemaHandler), !attr.required)
+        .withComment(attr.comment.getOrElse(""))
     }
     StructType(fields)
   }
