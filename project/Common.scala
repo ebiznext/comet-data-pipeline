@@ -105,8 +105,8 @@ object Versions {
   val spark2d4 = "2.4.7"
   val spark3d0 = "3.0.1"
   val scalatest = "3.2.3"
-  val sparXML211 = "0.10.0"
-  val sparXML212 = "0.10.0"
+  val sparXML211 = "0.11.0"
+  val sparXML212 = "0.11.0"
   val springBoot = "2.0.6.RELEASE"
   val typesafeConfig = "1.4.1"
   val scalaLogging = "3.9.2"
@@ -129,7 +129,7 @@ object Versions {
   val h2 = "1.4.200" // Test only
   val poi = "4.1.2"
   val scalate = "1.9.6"
-  val akkaHttp = "10.2.1"
+  val akkaHttp = "10.2.2"
   val akkaStream = "2.6.10"
 
 }
