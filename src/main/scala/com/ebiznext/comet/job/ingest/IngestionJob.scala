@@ -105,7 +105,7 @@ trait IngestionJob extends SparkJob {
           success = true,
           -1,
           -1,
-          rejectedRDD.count(),
+          -1,
           start,
           end.getTime - start.getTime,
           "success",
@@ -124,7 +124,7 @@ trait IngestionJob extends SparkJob {
           success = false,
           -1,
           -1,
-          rejectedRDD.count(),
+          -1,
           start,
           end.getTime - start.getTime,
           Utils.exceptionAsString(exception),
@@ -208,32 +208,37 @@ trait IngestionJob extends SparkJob {
                                         }
                                       } else acceptedDF).drop(Settings.cometInputFileNameColumn)
 
-    logger.whenDebugEnabled {
-      logger.debug("Accepted Dataframe schema right after adding computed columns")
-      acceptedDfWithScriptFields.printSchema()
-    }
-
-    val withScriptFieldsDF =
-      session.createDataFrame(
-        acceptedDfWithScriptFields.rdd,
-        schema.sparkTypeWithRenamedFields(schemaHandler)
-      )
-
-    logger.whenDebugEnabled {
-      logger.debug("Accepted Dataframe schema before optional merge")
-      withScriptFieldsDF.printSchema()
+    val finalAcceptedDF: DataFrame = schema.attributes.exists(_.script.isDefined) match {
+      case true => {
+        logger.whenDebugEnabled {
+          logger.debug("Accepted Dataframe schema right after adding computed columns")
+          acceptedDfWithScriptFields.printSchema()
+        }
+        // adding computed columns can change the order of columns, we must force the order defined in the schema
+        val orderedWithScriptFieldsDF =
+          session.createDataFrame(
+            acceptedDfWithScriptFields.rdd,
+            schema.sparkTypeWithRenamedFields(schemaHandler)
+          )
+        logger.whenDebugEnabled {
+          logger.debug("Accepted Dataframe schema after applying the defined schema")
+          orderedWithScriptFieldsDF.printSchema()
+        }
+        orderedWithScriptFieldsDF
+      }
+      case false => acceptedDfWithScriptFields
     }
 
     val mergedDF = schema.merge
       .map { mergeOptions =>
         if (metadata.getSink().map(_.`type`).getOrElse(SinkType.None) == SinkType.BQ) {
-          val mergedDfBq = mergeFromBQ(withScriptFieldsDF, mergeOptions)
+          val mergedDfBq = mergeFromBQ(finalAcceptedDF, mergeOptions)
           mergedDfBq
         } else {
-          mergeFromParquet(acceptedPath, withScriptFieldsDF, mergeOptions)
+          mergeFromParquet(acceptedPath, finalAcceptedDF, mergeOptions)
         }
       }
-      .getOrElse(withScriptFieldsDF)
+      .getOrElse(finalAcceptedDF)
 
     logger.info("Merged Dataframe Schema")
     mergedDF.printSchema()
@@ -255,7 +260,7 @@ trait IngestionJob extends SparkJob {
           success = true,
           -1,
           -1,
-          mergedDF.count(),
+          -1,
           start,
           end.getTime - start.getTime,
           "success",
@@ -273,7 +278,7 @@ trait IngestionJob extends SparkJob {
           success = false,
           -1,
           -1,
-          mergedDF.count(),
+          -1,
           start,
           end.getTime - start.getTime,
           Utils.exceptionAsString(exception),
@@ -296,7 +301,8 @@ trait IngestionJob extends SparkJob {
             format = "parquet",
             domain = domain.name,
             schema = schema.name,
-            dataset = Some(Right(mergedDF))
+            dataset = Some(Right(mergedDF)),
+            options = sink.map(_.getOptions).getOrElse(Map.empty)
           )
           new ESLoadJob(config, storageHandler, schemaHandler).run()
         case SinkType.ES if !settings.comet.elasticsearch.active =>
@@ -307,6 +313,10 @@ trait IngestionJob extends SparkJob {
             metadata.getWrite(),
             schema.merge.exists(_.key.nonEmpty)
           )
+          val tableSchema = schema.mergedMetadata(domain.metadata).getFormat() match {
+            case Format.XML => None
+            case _          => Some(schema.bqSchema(schemaHandler))
+          }
           val config = BigQueryLoadConfig(
             source = Right(mergedDF),
             outputTable = schema.name,
@@ -319,9 +329,10 @@ trait IngestionJob extends SparkJob {
             outputClustering = sink.flatMap(_.clustering).getOrElse(Nil),
             days = sink.flatMap(_.days),
             requirePartitionFilter = sink.flatMap(_.requirePartitionFilter).getOrElse(false),
-            rls = schema.rls
+            rls = schema.rls,
+            options = sink.map(_.getOptions).getOrElse(Map.empty)
           )
-          val res = new BigQuerySparkJob(config, Some(schema.bqSchema(schemaHandler))).run()
+          val res = new BigQuerySparkJob(config, tableSchema).run()
           res match {
             case Success(_) => ;
             case Failure(e) =>
@@ -355,7 +366,8 @@ trait IngestionJob extends SparkJob {
               createDisposition = createDisposition,
               writeDisposition = writeDisposition,
               partitions = partitions,
-              batchSize = batchSize
+              batchSize = batchSize,
+              options = sink.getOptions
             )
 
             val res = new ConnectionLoadJob(jdbcConfig).run()
@@ -515,15 +527,17 @@ trait IngestionJob extends SparkJob {
       session.emptyDataFrame
     }
     if (csvOutput() && area != StorageArea.rejected) {
-      val csvPath = storageHandler
+      val paths = storageHandler
         .list(targetPath, ".csv", LocalDateTime.MIN)
         .filterNot(path => schema.pattern.matcher(path.getName).matches())
-        .head
-      val finalCsvPath = new Path(
-        targetPath,
-        path.head.getName
-      )
-      storageHandler.move(csvPath, finalCsvPath)
+      if (path.nonEmpty) {
+        val csvPath = path.head
+        val finalCsvPath = new Path(
+          targetPath,
+          path.head.getName
+        )
+        storageHandler.move(csvPath, finalCsvPath)
+      }
     }
     resultDataFrame
   }
@@ -725,7 +739,7 @@ trait IngestionJob extends SparkJob {
         ) {
           val bqTable = s"${domain.name}.${schema.name}"
           (mergeOptions.queryFilter, metadata.sink) match {
-            case (Some(query), Some(BigQuerySink(_, _, Some(_), _, _, _))) =>
+            case (Some(query), Some(BigQuerySink(_, _, Some(_), _, _, _, _))) =>
               val queryArgs = query.richFormat(options)
               if (queryArgs.contains("latest")) {
                 val partitions =
@@ -842,18 +856,20 @@ object IngestionUtil {
             "CREATE_IF_NEEDED",
             "WRITE_APPEND",
             None,
-            None
+            None,
+            options = sink.getOptions
           )
           new BigQuerySparkJob(bqConfig, Some(bigqueryRejectedSchema())).run()
 
-        case JdbcSink(_, jdbcName, partitions, batchSize) =>
+        case sink: JdbcSink =>
           val jdbcConfig = ConnectionLoadConfig.fromComet(
-            jdbcName,
+            sink.connection,
             settings.comet,
             Right(rejectedDF),
             "rejected",
-            partitions = partitions.getOrElse(1),
-            batchSize = batchSize.getOrElse(1000)
+            partitions = sink.partitions.getOrElse(1),
+            batchSize = sink.batchsize.getOrElse(1000),
+            options = sink.getOptions
           )
 
           new ConnectionLoadJob(jdbcConfig).run()

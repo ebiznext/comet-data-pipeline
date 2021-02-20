@@ -126,13 +126,13 @@ object Versions {
   val bq = "1.120.0"
   val hadoop = "3.3.0"
   val h2 = "1.4.200" // Test only
-  val poi = "5.0.0"
+  val poi = "4.1.2"
   val scalate = "1.9.6"
   val akkaHttp = "10.1.13"
 //  val akkaStream = "2.6.12"
   val akkaStream = "2.5.32"
   val kafkaClients = "2.7.0"
-  val testContainers = "0.38.8"
+  val testContainers = "0.39.0"
 }
 
 object Resolvers {
