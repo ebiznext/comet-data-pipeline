@@ -8,7 +8,17 @@ lazy val scala212 = "2.12.12"
 
 lazy val scala211 = "2.11.12"
 
-lazy val sparkVersion = sys.env.getOrElse("COMET_SPARK_VERSION", "3.1.0")
+javacOptions ++= Seq("-source", "1.8", "-target", "1.8", "-Xlint")
+
+initialize := {
+  val _ = initialize.value
+  val javaVersion = sys.props("java.specification.version")
+  println(s"java Version is $javaVersion")
+  if (javaVersion != "1.8")
+    sys.error("Java 1.8 is required for this project. Found " + javaVersion + " instead")
+}
+
+lazy val sparkVersion = sys.env.getOrElse("COMET_SPARK_VERSION", "2.4.0")
 
 val sparkVersionPattern: Regex = "(\\d+).(\\d+).(\\d+)".r
 
@@ -30,7 +40,7 @@ organization := "com.ebiznext"
 
 organizationName := "Ebiznext"
 
-scalaVersion := scala212
+scalaVersion := scala211
 
 organizationHomepage := Some(url("http://www.ebiznext.com"))
 
