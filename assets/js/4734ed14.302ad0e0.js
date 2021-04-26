@@ -1,1 +1,0 @@
-(window.webpackJsonp=window.webpackJsonp||[]).push([[22],{92:function(a){a.exports=JSON.parse('{"allTagsPath":"/comet-data-pipeline/blog/tags","slug":"facebook","name":"facebook","count":1,"permalink":"/comet-data-pipeline/blog/tags/facebook"}')}}]);
