@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://ebiznext.github.io/blog</id>
-    <title>Build Optimized Big &amp; Fast Data Pipelines Blog</title>
+    <title>Quickly Build Optimized Big &amp; Fast Data Pipelines Blog</title>
     <updated>2021-04-26T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://ebiznext.github.io/blog"/>
-    <subtitle>Build Optimized Big &amp; Fast Data Pipelines Blog</subtitle>
+    <subtitle>Quickly Build Optimized Big &amp; Fast Data Pipelines Blog</subtitle>
     <icon>https://ebiznext.github.io/img/favicon.ico</icon>
     <entry>
         <title type="html"><![CDATA[Bonjour]]></title>
