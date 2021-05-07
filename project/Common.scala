@@ -109,7 +109,7 @@ object Versions {
   val hive = "3.1.0"
   val log4s = "1.3.3"
   val betterFiles = "3.9.1"
-  val jackson211ForSpark2 = "2.6.7"
+  val jackson211ForSpark2 = "2.6.7.1"
   val jackson212ForSpark3 = "2.10.0"
   val configs = "0.4.4"
   val esHadoop = "7.8.1"
