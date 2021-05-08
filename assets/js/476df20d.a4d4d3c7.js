@@ -1,0 +1,1 @@
+(window.webpackJsonp=window.webpackJsonp||[]).push([[20],{94:function(e){e.exports=JSON.parse('{"title":"Recent posts","items":[{"title":"Bonjour","permalink":"/comet-data-pipeline/blog/bonjour"}]}')}}]);
