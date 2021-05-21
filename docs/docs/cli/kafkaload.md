@@ -18,7 +18,7 @@ Parameter|Cardinality|Description
 --topic:`<value>`|*Required*|Topic Name declared in reference.conf file
 --format:`<value>`|*Optional*|Read/Write format eq : parquet, json, csv ... Default to parquet.
 --path:`<value>`|*Required*|Source file for load and target file for store
---mode:`<value>`|*Required*|When offload is true, describes who data should be stored on disk. Ignored if offload is false.
+--mode:`<value>`|*Required*|When offload is true, describes how data should be stored on disk. Ignored if offload is false.
 --write-options:`<value>`|*Optional*|Options to pass to Spark Writer
 --transform:`<value>`|*Optional*|Any transformation to apply to message before loading / offloading it
 --offload:`<value>`|*Optional*|If true, kafka topic is offloaded to path, else data contained in path is stored in the kafka topic
