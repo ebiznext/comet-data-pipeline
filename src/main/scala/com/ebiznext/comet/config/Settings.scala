@@ -298,7 +298,6 @@ object Settings extends StrictLogging {
       error.messages.foreach(err => logger.error(err))
       throw new Exception(s"Failed to load config: $error")
     }
-    logger.info(System.getenv("COMET_TEST_GCP_PROJECT_ID"))
     logger.info(s"Using Config $loaded")
     Settings(loaded, effectiveConfig.getConfig("spark"))
   }

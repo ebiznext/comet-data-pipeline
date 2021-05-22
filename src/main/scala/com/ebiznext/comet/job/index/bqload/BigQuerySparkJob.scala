@@ -192,9 +192,8 @@ class BigQuerySparkJob(
             .format("com.google.cloud.spark.bigquery")
             .option("table", bqTable)
             .option("intermediateFormat", intermediateFormat)
-          logger.info(s"ProjetID=$testProjectId")
           testProjectId.foreach(projectId => finalDF.option("project", projectId))
-          cliConfig.options.foldLeft(finalDF)((w, kv) => w.option(kv._1, kv._2)).save(bqTable)
+          cliConfig.options.foldLeft(finalDF)((w, kv) => w.option(kv._1, kv._2)).save()
       }
 
       val stdTableDefinitionAfter =
