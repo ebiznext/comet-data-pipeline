@@ -65,7 +65,7 @@ trait BigQueryJobBase extends StrictLogging {
     }
   }
 
-  val projectId = Option(System.getenv("COMET_TEST_GCP_PROJECT_ID"))
+  val testProjectId = scala.Option(System.getenv("COMET_TEST_GCP_PROJECT_ID"))
 
   val bqTable = s"${cliConfig.outputDataset}.${cliConfig.outputTable}"
 

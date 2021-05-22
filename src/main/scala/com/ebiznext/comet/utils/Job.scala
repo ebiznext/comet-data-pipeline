@@ -27,6 +27,11 @@ trait JobBase extends StrictLogging {
   def name: String
   implicit def settings: Settings
 
+  protected def addTestGcpProjectOption(existingBigQueryDFWriter: DataFrameReader): Unit = {
+    val testProjectId = Option(System.getenv("COMET_TEST_GCP_PROJECT_ID"))
+    testProjectId.foreach(projectId => existingBigQueryDFWriter.option("project", projectId))
+  }
+
   /** Just to force any job to implement its entry point using within the "run" method
     *
     * @return : Spark Dataframe for Spark Jobs None otherwise
@@ -254,7 +259,17 @@ trait SparkJob extends JobBase {
               }
 
           }
-        case BQ =>
+        case BQ => {
+          def makeReaderDF(filter: Option[String], path: String) = {
+            val dfReader = session.read
+              .option("readDataFormat", "AVRO")
+              .format("com.google.cloud.spark.bigquery")
+              .option("table", path)
+            filter.foreach(filter => dfReader.option("filter", filter))
+            addTestGcpProjectOption(dfReader)
+            dfReader
+          }
+
           val TablePathWithFilter = "(.*)\\.comet_filter\\((.*)\\)".r
           val TablePathWithSelect = "(.*)\\.comet_select\\((.*)\\)".r
           val TablePathWithFilterAndSelect =
@@ -265,40 +280,31 @@ trait SparkJob extends JobBase {
                 .info(
                   s"We are loading the Table with columns: $select and filters: $filter"
                 )
-              session.read
-                .option("readDataFormat", "AVRO")
-                .format("com.google.cloud.spark.bigquery")
-                .option("table", tablePath)
-                .option("filter", filter)
+              val dfReader = makeReaderDF(Some(filter), tablePath)
+              dfReader
                 .load()
                 .selectExpr(select.replaceAll("\\s", "").split(","): _*)
                 .cache()
             case TablePathWithFilter(tablePath, filter) =>
               logger.info(s"We are loading the Table with filters: $filter")
-              session.read
-                .option("readDataFormat", "AVRO")
-                .format("com.google.cloud.spark.bigquery")
-                .option("table", tablePath)
-                .option("filter", filter)
+              val dfReader = makeReaderDF(Some(filter), tablePath)
+              dfReader
                 .load()
                 .cache()
             case TablePathWithSelect(tablePath, select) =>
               logger.info(s"We are loading the Table with columns: $select")
-              session.read
-                .option("readDataFormat", "AVRO")
-                .format("com.google.cloud.spark.bigquery")
-                .option("table", tablePath)
+              val dfReader = makeReaderDF(None, tablePath)
+              dfReader
                 .load()
                 .selectExpr(select.replaceAll("\\s", "").split(","): _*)
                 .cache()
             case _ =>
-              session.read
-                .option("readDataFormat", "AVRO")
-                .format("com.google.cloud.spark.bigquery")
-                .option("table", path)
+              val dfReader = makeReaderDF(None, path)
+              dfReader
                 .load()
                 .cache()
           }
+        }
         case _ =>
           throw new Exception("Should never happen")
       }

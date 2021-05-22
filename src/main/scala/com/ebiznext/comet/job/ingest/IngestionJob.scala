@@ -825,7 +825,7 @@ trait IngestionJob extends SparkJob {
                 val partitions =
                   tableMetadata.biqueryClient.listPartitions(table.getTableId).asScala.toList
                 val latestPartition = partitions.last
-                val existingBigQueryDF = session.read
+                val existingBigQueryDFWriter = session.read
                   // We provided the acceptedDF schema here since BQ lose the required / nullable information of the schema
                   .schema(withScriptFieldsDF.schema)
                   .format("com.google.cloud.spark.bigquery")
@@ -834,26 +834,29 @@ trait IngestionJob extends SparkJob {
                     "filter",
                     queryArgs.replace("latest", s"PARSE_DATE('%Y%m%d','$latestPartition')")
                   )
-                  .load()
+                addTestGcpProjectOption(existingBigQueryDFWriter)
+                val existingBigQueryDF = existingBigQueryDFWriter.load()
                 processMerge(withScriptFieldsDF, existingBigQueryDF, mergeOptions)
 
               } else {
-                val existingBigQueryDF = session.read
+                val existingBigQueryDFWriter = session.read
                   // We provided the acceptedDF schema here since BQ lose the required / nullable information of the schema
                   .schema(withScriptFieldsDF.schema)
                   .format("com.google.cloud.spark.bigquery")
                   .option("table", bqTable)
                   .option("filter", queryArgs)
-                  .load()
+                addTestGcpProjectOption(existingBigQueryDFWriter)
+                val existingBigQueryDF = existingBigQueryDFWriter.load()
                 processMerge(withScriptFieldsDF, existingBigQueryDF, mergeOptions)
               }
             case _ =>
-              val existingBigQueryDF = session.read
+              val existingBigQueryDFWriter = session.read
                 // We provided the acceptedDF schema here since BQ lose the required / nullable information of the schema
                 .schema(withScriptFieldsDF.schema)
                 .format("com.google.cloud.spark.bigquery")
                 .option("table", bqTable)
-                .load()
+              addTestGcpProjectOption(existingBigQueryDFWriter)
+              val existingBigQueryDF = existingBigQueryDFWriter.load()
               processMerge(withScriptFieldsDF, existingBigQueryDF, mergeOptions)
           }
 
