@@ -25,22 +25,25 @@ object BigQueryUtils {
     BigQuerySchemaConverters.toBigQuerySchema(schema.asInstanceOf[StructType])
   }
 
+  private val credFile = Option(System.getenv("COMET_TEST_GCP_CREDENTIALS_FILE"))
+  private val cred = Option(System.getenv("COMET_TEST_GCP_CREDENTIALS"))
+  private val projectId = Option(System.getenv("COMET_TEST_GCP_PROJECT_ID"))
+
   def bqOptions(): BigQueryOptions = {
-    unitTestLoadGcpCredentials() match {
+    val bqOptionsBuilder = unitTestLoadGcpCredentials() match {
       case Some(unitTestGcpCredentials) =>
         val credentials = ServiceAccountCredentials.fromStream(
           new ByteArrayInputStream(unitTestGcpCredentials.getBytes())
         )
-        BigQueryOptions.newBuilder().setCredentials(credentials).build()
+        BigQueryOptions.newBuilder().setCredentials(credentials)
       case None =>
-        BigQueryOptions.getDefaultInstance
+        BigQueryOptions.newBuilder()
     }
+    projectId.foreach(projectId => bqOptionsBuilder.setProjectId(projectId))
+    bqOptionsBuilder.build()
   }
 
   def unitTestLoadGcpCredentials(): Option[String] = {
-    val credFile = Option(System.getenv("COMET_TEST_GCP_CREDENTIALS_FILE"))
-    val cred = Option(System.getenv("COMET_TEST_GCP_CREDENTIALS"))
-    val projectId = Option(System.getenv("COMET_TEST_GCP_PROJECT_ID"))
     (credFile, projectId) match {
       case (_, None) => None
       case (Some(credFile), Some(_)) =>
