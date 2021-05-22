@@ -22,8 +22,7 @@ package com.ebiznext.comet.schema.model
 
 import com.ebiznext.comet.config.Settings
 import com.ebiznext.comet.schema.handlers.SchemaHandler
-import com.ebiznext.comet.utils.Utils
-import com.ebiznext.comet.utils.conversion.BigQueryUtils
+import com.ebiznext.comet.utils.{BigQueryUtils, Utils}
 import com.fasterxml.jackson.annotation.JsonIgnore
 import org.apache.spark.sql.types._
 import com.ebiznext.comet.utils.Formatter._

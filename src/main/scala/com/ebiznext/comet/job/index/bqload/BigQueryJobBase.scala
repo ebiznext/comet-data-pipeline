@@ -1,7 +1,6 @@
 package com.ebiznext.comet.job.index.bqload
 
 import java.util
-
 import com.ebiznext.comet.schema.model.{RowLevelSecurity, UserType}
 import com.google.cloud.bigquery._
 import com.google.cloud.{Identity, Policy, Role}
@@ -53,8 +52,6 @@ trait BigQueryJobBase extends StrictLogging {
     rlsDeleteStatement ++ rlsCreateStatements
   }
 
-  val bigquery: BigQuery = BigQueryOptions.getDefaultInstance.getService
-
   val tableId: TableId = BigQueryJobBase.extractProjectDatasetAndTable(
     cliConfig.outputDataset + "." + cliConfig.outputTable
   )
@@ -70,7 +67,7 @@ trait BigQueryJobBase extends StrictLogging {
 
   val bqTable = s"${cliConfig.outputDataset}.${cliConfig.outputTable}"
 
-  def getOrCreateDataset(): Dataset = {
+  def getOrCreateDataset(bigquery: BigQuery): Dataset = {
     val dataset = scala.Option(bigquery.getDataset(datasetId))
     dataset.getOrElse {
       val datasetInfo = DatasetInfo
@@ -89,7 +86,7 @@ trait BigQueryJobBase extends StrictLogging {
     * @param rls
     * @return
     */
-  def applyTableIamPolicy(tableId: TableId, rls: RowLevelSecurity): Policy = {
+  def applyTableIamPolicy(bigquery: BigQuery, tableId: TableId, rls: RowLevelSecurity): Policy = {
     val BIG_QUERY_VIEWER_ROLE = "roles/bigquery.dataViewer"
     val existingPolicy: Policy = bigquery.getIamPolicy(tableId)
     val existingPolicyBindings: util.Map[Role, util.Set[Identity]] = existingPolicy.getBindings

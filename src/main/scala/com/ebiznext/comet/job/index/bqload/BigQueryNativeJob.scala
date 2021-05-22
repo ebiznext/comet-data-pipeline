@@ -1,7 +1,7 @@
 package com.ebiznext.comet.job.index.bqload
 
 import com.ebiznext.comet.config.Settings
-import com.ebiznext.comet.utils.{JobBase, JobResult, Utils}
+import com.ebiznext.comet.utils.{BigQueryUtils, JobBase, JobResult, Utils}
 import com.google.cloud.ServiceOptions
 import com.google.cloud.bigquery.JobInfo.{CreateDisposition, WriteDisposition}
 import com.google.cloud.bigquery._
@@ -26,9 +26,11 @@ class BigQueryNativeJob(
 
   logger.info(s"BigQuery Config $cliConfig")
 
+  val bigquery: BigQuery = BigQueryUtils.bqOptions().getService
+
   def runNativeConnector(): Try[BigQueryJobResult] = {
     Try {
-      val targetDataset = getOrCreateDataset()
+      val targetDataset = getOrCreateDataset(bigquery)
       val queryConfig: QueryJobConfiguration.Builder =
         QueryJobConfiguration
           .newBuilder(sql)

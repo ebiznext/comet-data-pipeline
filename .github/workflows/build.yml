@@ -11,6 +11,9 @@ on:
   pull_request:
     branches:
       - '**'
+env:
+  COMET_TEST_GCP_CREDENTIALS: ${{ secrets.COMET_TEST_GCP_CREDENTIALS }}
+  COMET_TEST_GCS_BUCKET: comet-data-pipeline-test
 jobs:
   test:
     runs-on: ubuntu-latest

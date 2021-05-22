@@ -20,11 +20,15 @@
 
 package com.ebiznext.comet.config
 
+import better.files.File
+import com.ebiznext.comet.utils.BigQueryUtils
+
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import com.typesafe.scalalogging.StrictLogging
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
+
 import scala.collection.JavaConverters._
 
 /** Any Spark Job will inherit from this class.
@@ -53,6 +57,11 @@ class SparkEnv(name: String)(implicit settings: Settings) extends StrictLogging 
 
     logger.whenDebugEnabled {
       thisConf.getAll.foreach { case (k, v) => logger.debug(s"$k=$v") }
+    }
+    BigQueryUtils.unitTestLoadCredentials().foreach { unitTestGcpCredentials =>
+      val file = File.newTemporaryFile()
+      file.overwrite(unitTestGcpCredentials)
+      thisConf.set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", file.pathAsString)
     }
     thisConf
   }

@@ -1,0 +1,441 @@
+/*
+ *
+ *  * Licensed to the Apache Software Foundation (ASF) under one or more
+ *  * contributor license agreements.  See the NOTICE file distributed with
+ *  * this work for additional information regarding copyright ownership.
+ *  * The ASF licenses this file to You under the Apache License, Version 2.0
+ *  * (the "License"); you may not use this file except in compliance with
+ *  * the License.  You may obtain a copy of the License at
+ *  *
+ *  *    http://www.apache.org/licenses/LICENSE-2.0
+ *  *
+ *  * Unless required by applicable law or agreed to in writing, software
+ *  * distributed under the License is distributed on an "AS IS" BASIS,
+ *  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  * See the License for the specific language governing permissions and
+ *  * limitations under the License.
+ *
+ *
+ */
+
+package com.ebiznext.comet.schema.handlers
+
+import com.databricks.spark.xml._
+import com.dimafeng.testcontainers.ElasticsearchContainer
+import com.ebiznext.comet.TestHelper
+import com.softwaremill.sttp.{HttpURLConnectionBackend, _}
+import com.typesafe.config.{Config, ConfigFactory}
+import org.apache.hadoop.fs.Path
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{Metadata => _, _}
+
+import scala.util.Try
+
+class DsvHandlerSpec extends TestHelper {
+  val esContainer: ElasticsearchContainer = ElasticsearchContainer.Def().start()
+
+  override def afterAll(): Unit = {
+    // We need to start it manually because we need to access the HTTP mapped port
+    // in the configuration below before any test get executed.
+    esContainer.stop()
+    super.afterAll()
+  }
+
+  private val playerSchema: StructType = StructType(
+    Seq(
+      StructField("PK", StringType),
+      StructField("firstName", StringType),
+      StructField("lastName", StringType),
+      StructField("DOB", DateType),
+      StructField("YEAR", IntegerType),
+      StructField("MONTH", IntegerType)
+    )
+  )
+
+  val configuration: Config =
+    ConfigFactory
+      .parseString(s"""
+                     |elasticsearch {
+                     |  active = true
+                     |  options = {
+                     |    "es.nodes.wan.only": "true"
+                     |    "es.nodes": "localhost"
+                     |    "es.port": "${esContainer.httpHostAddress.substring(
+        esContainer.httpHostAddress.lastIndexOf(':') + 1
+      )}",
+                     |
+                     |    #  net.http.auth.user = ""
+                     |    #  net.http.auth.pass = ""
+                     |
+                     |    "es.net.ssl": "false"
+                     |    "es.net.ssl.cert.allow.self.signed": "false"
+                     |
+                     |    "es.batch.size.entries": "1000"
+                     |    "es.batch.size.bytes": "1mb"
+                     |    "es.batch.write.retry.count": "3"
+                     |    "es.batch.write.retry.wait": "10s"
+                     |  }
+                     |}
+                     |""".stripMargin)
+      .withFallback(super.testConfiguration)
+
+  new WithSettings(configuration) {
+    // TODO Helper (to delete)
+    "Ingest CSV" should "produce file in accepted" in {
+
+      new SpecTrait(
+        domainOrJobFilename = "DOMAIN.comet.yml",
+        sourceDomainOrJobPathname = s"/sample/DOMAIN.comet.yml",
+        datasetDomainName = "DOMAIN",
+        sourceDatasetPathName = "/sample/SCHEMA-VALID.dsv"
+      ) {
+
+        cleanMetadata
+        cleanDatasets
+
+        loadPending
+
+        // Check Archived
+        readFileContent(
+          cometDatasetsPath + s"/archive/$datasetDomainName/SCHEMA-VALID.dsv"
+        ) shouldBe loadTextFile(
+          sourceDatasetPathName
+        )
+
+        // Check rejected
+
+        val rejectedDf = sparkSession.read
+          .parquet(cometDatasetsPath + s"/rejected/$datasetDomainName/User")
+
+        val expectedRejectedF = prepareDateColumns(
+          sparkSession.read
+            .schema(prepareSchema(rejectedDf.schema))
+            .json(getResPath("/expected/datasets/rejected/DOMAIN.json"))
+        )
+
+        expectedRejectedF.except(rejectedDf).count() shouldBe 1
+
+        // Accepted should have the same data as input
+        val acceptedDf = sparkSession.read
+          .parquet(cometDatasetsPath + s"/accepted/$datasetDomainName/User/$getTodayPartitionPath")
+
+        printDF(acceptedDf, "acceptedDf")
+        val expectedAccepted =
+          sparkSession.read
+            .schema(acceptedDf.schema)
+            .json(getResPath("/expected/datasets/accepted/DOMAIN/User.json"))
+
+        printDF(expectedAccepted, "expectedAccepted")
+        acceptedDf
+          .select("firstname")
+          .except(expectedAccepted.select("firstname"))
+          .count() shouldBe 0
+
+        if (settings.comet.isElasticsearchSupported()) {
+          implicit val backend = HttpURLConnectionBackend()
+          val countUri = uri"http://${esContainer.httpHostAddress}/domain.user/_count"
+          val response = sttp.get(countUri).send()
+          response.code should be <= 299
+          response.code should be >= 200
+          assert(response.body.isRight)
+          response.body.right.toString() contains "\"count\":2"
+        }
+      }
+    }
+
+    "Ingest schema with partition" should "produce partitioned output in accepted" in {
+      new SpecTrait(
+        domainOrJobFilename = "DOMAIN.comet.yml",
+        sourceDomainOrJobPathname = s"/sample/DOMAIN.comet.yml",
+        datasetDomainName = "DOMAIN",
+        sourceDatasetPathName = "/sample/Players.csv"
+      ) {
+        cleanMetadata
+        cleanDatasets
+        loadPending
+
+        private val firstLevel: List[Path] = storageHandler.listDirectories(
+          new Path(cometDatasetsPath + s"/accepted/$datasetDomainName/Players")
+        )
+
+        firstLevel.size shouldBe 2
+        firstLevel.foreach(storageHandler.listDirectories(_).size shouldBe 2)
+
+        sparkSession.read
+          .parquet(cometDatasetsPath + s"/accepted/$datasetDomainName/Players")
+          .except(
+            sparkSession.read
+              .option("header", "false")
+              .schema(playerSchema)
+              .csv(getResPath("/sample/Players.csv"))
+          )
+          .count() shouldBe 0
+
+      }
+    }
+
+    "Ingest schema with merge" should "produce merged results accepted" in {
+      new SpecTrait(
+        domainOrJobFilename = "DOMAIN.comet.yml",
+        sourceDomainOrJobPathname = s"/sample/DOMAIN.comet.yml",
+        datasetDomainName = "DOMAIN",
+        sourceDatasetPathName = "/sample/Players.csv"
+      ) {
+        cleanMetadata
+        cleanDatasets
+        loadPending
+      }
+
+      new SpecTrait(
+        domainOrJobFilename = "DOMAIN.comet.yml",
+        sourceDomainOrJobPathname = s"/sample/DOMAIN.comet.yml",
+        datasetDomainName = "DOMAIN",
+        sourceDatasetPathName = "/sample/Players-merge.csv"
+      ) {
+
+        loadPending
+
+        val acceptedDf: DataFrame = sparkSession.read
+          .parquet(cometDatasetsPath + s"/accepted/$datasetDomainName/Players")
+
+        val players: DataFrame = sparkSession.read
+          .option("header", "false")
+          .option("encoding", "UTF-8")
+          .schema(playerSchema)
+          .csv(getResPath("/sample/Players.csv"))
+
+        val playersMerge: DataFrame = sparkSession.read
+          .option("header", "false")
+          .option("encoding", "UTF-8")
+          .schema(playerSchema)
+          .csv(getResPath("/sample/Players-merge.csv"))
+
+        val playersPk: Array[String] = players.select("PK").collect().map(_.getString(0))
+
+        val expected: DataFrame = playersMerge
+          .union(players.join(playersMerge, Seq("PK"), "left_anti"))
+          .union(players.filter(!col("PK").isin(playersPk: _*)))
+
+        acceptedDf
+          .except(expected)
+          .count() shouldBe 0
+
+      }
+    }
+
+    "A postsql query" should "update the resulting schema" in {
+      new SpecTrait(
+        domainOrJobFilename = "DOMAIN.comet.yml",
+        sourceDomainOrJobPathname = s"/sample/DOMAIN.comet.yml",
+        datasetDomainName = "DOMAIN",
+        sourceDatasetPathName = "/sample/employee.csv"
+      ) {
+        cleanMetadata
+        cleanDatasets
+        loadPending
+        val acceptedDf: DataFrame = sparkSession.read
+          .parquet(cometDatasetsPath + s"/accepted/$datasetDomainName/employee")
+        acceptedDf.schema.fields.size shouldBe 1
+        acceptedDf.schema.fields.map(_.name).count("name".equals) shouldBe 1
+
+      }
+    }
+
+    "Ingest Dream Contact CSV" should "produce file in accepted" in {
+      new SpecTrait(
+        domainOrJobFilename = "dream.comet.yml",
+        sourceDomainOrJobPathname = s"/sample/dream/dream.comet.yml",
+        datasetDomainName = "dream",
+        sourceDatasetPathName = "/sample/dream/OneClient_Contact_20190101_090800_008.psv"
+      ) {
+
+        cleanMetadata
+
+        cleanDatasets
+
+        loadPending
+
+        readFileContent(
+          cometDatasetsPath + s"/archive/$datasetDomainName/OneClient_Contact_20190101_090800_008.psv"
+        ) shouldBe loadTextFile(
+          sourceDatasetPathName
+        )
+
+        //If we run this test alone, we do not have rejected, else we have rejected but not accepted ...
+        Try {
+          printDF(
+            sparkSession.read.parquet(
+              cometDatasetsPath + "/rejected/dream/client"
+            ),
+            "dream/client"
+          )
+        }
+
+        // Accepted should have the same data as input
+        val acceptedDf = sparkSession.read
+          .parquet(
+            cometDatasetsPath + s"/accepted/$datasetDomainName/client/${getTodayPartitionPath}"
+          )
+          // Timezone Problem
+          .drop("customer_creation_date")
+
+        val expectedAccepted =
+          sparkSession.read
+            .schema(acceptedDf.schema)
+            .json(getResPath("/expected/datasets/accepted/dream/client.json"))
+            // Timezone Problem
+            .drop("customer_creation_date")
+            .withColumn("truncated_zip_code", substring(col("zip_code"), 0, 3))
+            .withColumn("source_file_name", lit("OneClient_Contact_20190101_090800_008.psv"))
+
+        acceptedDf.except(expectedAccepted).count() shouldBe 0
+      }
+
+    }
+
+    "Ingest Dream Segment CSV" should "produce file in accepted" in {
+
+      new SpecTrait(
+        domainOrJobFilename = "dream.comet.yml",
+        sourceDomainOrJobPathname = "/sample/dream/dream.comet.yml",
+        datasetDomainName = "dream",
+        sourceDatasetPathName = "/sample/dream/OneClient_Segmentation_20190101_090800_008.psv"
+      ) {
+        cleanMetadata
+        cleanDatasets
+
+        loadPending
+
+        readFileContent(
+          cometDatasetsPath + s"/archive/$datasetDomainName/OneClient_Segmentation_20190101_090800_008.psv"
+        ) shouldBe loadTextFile(
+          sourceDatasetPathName
+        )
+
+        // Accepted should have the same data as input
+        val acceptedDf = sparkSession.read
+          .parquet(
+            cometDatasetsPath + s"/accepted/$datasetDomainName/segment/${getTodayPartitionPath}"
+          )
+
+        val expectedAccepted =
+          sparkSession.read
+            .schema(acceptedDf.schema)
+            .json(getResPath("/expected/datasets/accepted/dream/segment.json"))
+
+        acceptedDf.except(expectedAccepted).count() shouldBe 0
+
+      }
+
+    }
+
+    "Ingest Locations JSON" should "produce file in accepted" in {
+
+      new SpecTrait(
+        domainOrJobFilename = "locations.comet.yml",
+        sourceDomainOrJobPathname = s"/sample/simple-json-locations/locations.comet.yml",
+        datasetDomainName = "locations",
+        sourceDatasetPathName = "/sample/simple-json-locations/locations.json"
+      ) {
+        cleanMetadata
+        cleanDatasets
+
+        loadPending
+
+        readFileContent(
+          cometDatasetsPath + s"/${settings.comet.area.archive}/$datasetDomainName/locations.json"
+        ) shouldBe loadTextFile(
+          sourceDatasetPathName
+        )
+
+        // Accepted should have the same data as input
+        val acceptedDf = sparkSession.read
+          .parquet(
+            cometDatasetsPath + s"/accepted/$datasetDomainName/locations/$getTodayPartitionPath"
+          )
+
+        val expectedAccepted =
+          sparkSession.read
+            .json(
+              getResPath("/expected/datasets/accepted/locations/locations.json")
+            )
+            .withColumn("name_upper_case", upper(col("name")))
+            .withColumn("source_file_name", lit("locations.json"))
+
+        acceptedDf
+          .except(expectedAccepted.select(acceptedDf.columns.map(col): _*))
+          .count() shouldBe 0
+
+      }
+
+    }
+
+    "Ingest Locations XML" should "produce file in accepted" in {
+
+      new SpecTrait(
+        domainOrJobFilename = "locations.comet.yml",
+        sourceDomainOrJobPathname = s"/sample/xml/locations.comet.yml",
+        datasetDomainName = "locations",
+        sourceDatasetPathName = "/sample/xml/locations.xml"
+      ) {
+        cleanMetadata
+        cleanDatasets
+
+        loadPending
+
+        readFileContent(
+          cometDatasetsPath + s"/${settings.comet.area.archive}/$datasetDomainName/locations.xml"
+        ) shouldBe loadTextFile(
+          sourceDatasetPathName
+        )
+
+        // Accepted should have the same data as input
+        val acceptedDf = sparkSession.read
+          .parquet(
+            cometDatasetsPath + s"/accepted/$datasetDomainName/locations/$getTodayPartitionPath"
+          )
+        acceptedDf.show(false)
+        val expectedAccepted =
+          sparkSession.read
+            .option("rowTag", "element")
+            .xml(
+              getResPath("/expected/datasets/accepted/locations/locations.xml")
+            )
+
+        acceptedDf.except(expectedAccepted).count() shouldBe 0
+
+      }
+
+    }
+
+    "Load Business with Transform Tag" should "load an AutoDesc" in {
+      new SpecTrait(
+        domainOrJobFilename = "locations.comet.yml",
+        sourceDomainOrJobPathname = "/sample/simple-json-locations/locations.comet.yml",
+        datasetDomainName = "locations",
+        sourceDatasetPathName = "/sample/simple-json-locations/locations.json"
+      ) {
+        import org.scalatest.TryValues._
+        cleanMetadata
+        cleanDatasets
+        val schemaHandler = new SchemaHandler(storageHandler)
+        val filename = "/sample/metadata/business/business.comet.yml"
+        val jobPath = new Path(getClass.getResource(filename).toURI)
+        val job = schemaHandler.loadJobFromFile(jobPath)
+        job.success.value.name shouldBe "business" // Job renamed to filename and error is logged
+      }
+    }
+
+    //TODO TOFIX
+    //  "Load Business Definition" should "produce business dataset" in {
+    //    val sh = new HdfsStorageHandler
+    //    val jobsPath = new Path(DatasetArea.jobs, "sample/metadata/business/business.comet.yml")
+    //    sh.write(loadFile("/sample/metadata/business/business.comet.yml"), jobsPath)
+    //    DatasetArea.initDomains(storageHandler, schemaHandler.domains.map(_.name))
+    //    val validator = new DatasetWorkflow(storageHandler, schemaHandler, new SimpleLauncher)
+    //    validator.autoJob("business1")
+    //  }
+
+  }
+}

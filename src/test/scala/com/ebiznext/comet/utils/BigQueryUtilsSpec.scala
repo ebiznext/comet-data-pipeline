@@ -1,4 +1,4 @@
-package com.ebiznext.comet.utils.conversion
+package com.ebiznext.comet.utils
 
 import com.ebiznext.comet.TestHelper
 import com.ebiznext.comet.config.SparkEnv

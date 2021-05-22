@@ -1,8 +1,8 @@
 package com.ebiznext.comet.job.index.bqload
 
 import com.ebiznext.comet.config.Settings
-import com.ebiznext.comet.utils.conversion.BigQueryUtils._
-import com.ebiznext.comet.utils.{JobResult, SparkJob, SparkJobResult, Utils}
+import com.ebiznext.comet.utils.BigQueryUtils._
+import com.ebiznext.comet.utils.{BigQueryUtils, JobResult, SparkJob, SparkJobResult, Utils}
 import com.google.cloud.ServiceOptions
 import com.google.cloud.bigquery.{
   BigQuery,
@@ -40,10 +40,13 @@ class BigQuerySparkJob(
 
   val bucket: String = conf.get("fs.defaultFS")
 
+  val bigquery: BigQuery = BigQueryUtils.bqOptions().getService
+
   def prepareConf(): Configuration = {
     val conf = session.sparkContext.hadoopConfiguration
     logger.info(s"BigQuery Config $cliConfig")
-    val bucket = Option(conf.get("fs.gs.system.bucket"))
+    val bucket =
+      Option(System.getenv("COMET_GCS_BUCKET")).orElse(Option(conf.get("fs.gs.system.bucket")))
     bucket.foreach { bucket =>
       logger.info(s"Temporary GCS path $bucket")
       session.conf.set("temporaryGcsBucket", bucket)
@@ -66,7 +69,7 @@ class BigQuerySparkJob(
     dataFrame: Option[DataFrame],
     maybeSchema: Option[BQSchema]
   ): (Table, StandardTableDefinition) = {
-    getOrCreateDataset()
+    getOrCreateDataset(bigquery)
 
     val table = Option(bigquery.getTable(tableId)) getOrElse {
       val withPartitionDefinition =
@@ -224,7 +227,7 @@ class BigQuerySparkJob(
 
   private def setTablePolicy(table: Table) = {
     cliConfig.rls match {
-      case Some(h :: Nil) => applyTableIamPolicy(table.getTableId, h)
+      case Some(h :: Nil) => applyTableIamPolicy(bigquery, table.getTableId, h)
       case _              => logger.info(s"Table ACL is not set on this Table: $tableId")
     }
   }

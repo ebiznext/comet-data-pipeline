@@ -5,6 +5,8 @@ on:
 env:
   SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
   SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+  COMET_TEST_GCP_CREDENTIALS: ${{ secrets.COMET_TEST_GCP_CREDENTIALS }}
+  COMET_TEST_GCS_BUCKET: comet-data-pipeline-test
 jobs:
   release:
     runs-on: ubuntu-18.04

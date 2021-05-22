@@ -12,9 +12,8 @@ import com.ebiznext.comet.schema.model.Rejection.{ColInfo, ColResult}
 import com.ebiznext.comet.schema.model.Trim.{BOTH, LEFT, RIGHT}
 import com.ebiznext.comet.schema.model._
 import com.ebiznext.comet.utils.Formatter._
-import com.ebiznext.comet.utils.conversion.BigQueryUtils
 import com.ebiznext.comet.utils.kafka.KafkaClient
-import com.ebiznext.comet.utils.{JobResult, SparkJob, SparkJobResult, Utils}
+import com.ebiznext.comet.utils.{BigQueryUtils, JobResult, SparkJob, SparkJobResult, Utils}
 import com.google.cloud.bigquery.JobInfo.{CreateDisposition, WriteDisposition}
 import com.google.cloud.bigquery.{
   Field,
