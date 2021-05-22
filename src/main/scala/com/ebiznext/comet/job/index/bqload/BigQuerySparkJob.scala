@@ -46,7 +46,7 @@ class BigQuerySparkJob(
     val conf = session.sparkContext.hadoopConfiguration
     logger.info(s"BigQuery Config $cliConfig")
     val bucket =
-      Option(System.getenv("COMET_GCS_BUCKET")).orElse(Option(conf.get("fs.gs.system.bucket")))
+      Option(System.getenv("COMET_TEST_GCS_BUCKET")).orElse(Option(conf.get("fs.gs.system.bucket")))
     bucket.foreach { bucket =>
       logger.info(s"Temporary GCS path $bucket")
       session.conf.set("temporaryGcsBucket", bucket)
