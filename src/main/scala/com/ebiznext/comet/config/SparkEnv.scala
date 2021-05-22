@@ -58,7 +58,7 @@ class SparkEnv(name: String)(implicit settings: Settings) extends StrictLogging 
     logger.whenDebugEnabled {
       thisConf.getAll.foreach { case (k, v) => logger.debug(s"$k=$v") }
     }
-    BigQueryUtils.unitTestLoadCredentials().foreach { unitTestGcpCredentials =>
+    BigQueryUtils.unitTestLoadGcpCredentials().foreach { unitTestGcpCredentials =>
       val file = File.newTemporaryFile()
       file.overwrite(unitTestGcpCredentials)
       logger.info(s"Set json key file to $file")

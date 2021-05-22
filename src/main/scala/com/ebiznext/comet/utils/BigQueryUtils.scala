@@ -26,7 +26,7 @@ object BigQueryUtils {
   }
 
   def bqOptions(): BigQueryOptions = {
-    unitTestLoadCredentials() match {
+    unitTestLoadGcpCredentials() match {
       case Some(unitTestGcpCredentials) =>
         val credentials = ServiceAccountCredentials.fromStream(
           new ByteArrayInputStream(unitTestGcpCredentials.getBytes())
@@ -37,16 +37,18 @@ object BigQueryUtils {
     }
   }
 
-  def unitTestLoadCredentials(): Option[String] = {
+  def unitTestLoadGcpCredentials(): Option[String] = {
     val credFile = Option(System.getenv("COMET_TEST_GCP_CREDENTIALS_FILE"))
     val cred = Option(System.getenv("COMET_TEST_GCP_CREDENTIALS"))
-    credFile match {
-      case Some(credFile) =>
+    val projectId = Option(System.getenv("COMET_TEST_GCP_PROJECT_ID"))
+    (credFile, projectId) match {
+      case (_, None) => None
+      case (Some(credFile), Some(_)) =>
         val source = Source.fromFile(credFile)
         val cometGcpCredentials = source.getLines.mkString
         source.close()
         Some(cometGcpCredentials)
-      case None => cred
+      case (None, Some(_)) => cred
     }
   }
 }

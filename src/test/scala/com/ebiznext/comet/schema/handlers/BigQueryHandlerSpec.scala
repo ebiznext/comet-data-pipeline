@@ -8,10 +8,10 @@ import com.ebiznext.comet.workflow.{IngestionWorkflow, TransformConfig}
 import org.apache.hadoop.fs.Path
 
 class BigQueryHandlerSpec extends TestHelper {
-  val doTest = BigQueryUtils.unitTestLoadCredentials().nonEmpty
+  val doTest = BigQueryUtils.unitTestLoadGcpCredentials().nonEmpty
 
-  new WithSettings() {
-    "A DSV File" should "be ingested in BigQuery" in {
+  "A DSV File" should "be ingested in BigQuery" in {
+    new WithSettings() {
       if (doTest) {
         new SpecTrait(
           domainOrJobFilename = "BQ.comet.yml",
@@ -25,7 +25,9 @@ class BigQueryHandlerSpec extends TestHelper {
         }
       }
     }
-    "trigger AutoJob with no parameters on SQL statement" should "generate a dataset in BigQuery" in {
+  }
+  "trigger AutoJob with no parameters on SQL statement" should "generate a dataset in BigQuery" in {
+    new WithSettings() {
       if (doTest) {
         val businessTask1 = AutoTaskDesc(
           None,
