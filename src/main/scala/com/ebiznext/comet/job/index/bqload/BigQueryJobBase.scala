@@ -69,7 +69,7 @@ trait BigQueryJobBase extends StrictLogging {
 
   val bqTable =
     testProjectId
-      .map(_ + ".")
+      .map(_ + ":")
       .getOrElse("") + s"${cliConfig.outputDataset}.${cliConfig.outputTable}"
 
   def getOrCreateDataset(bigquery: BigQuery): Dataset = {
