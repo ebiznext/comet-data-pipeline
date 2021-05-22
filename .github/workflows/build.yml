@@ -13,6 +13,7 @@ on:
       - '**'
 env:
   COMET_TEST_GCP_CREDENTIALS: ${{ secrets.COMET_TEST_GCP_CREDENTIALS }}
+  COMET_TEST_GCP_PROJECT_ID: ${{ secrets.COMET_TEST_GCP_PROJECT_ID }}
   COMET_TEST_GCS_BUCKET: comet-data-pipeline-test
 jobs:
   test:

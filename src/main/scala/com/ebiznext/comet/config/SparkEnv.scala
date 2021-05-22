@@ -62,6 +62,7 @@ class SparkEnv(name: String)(implicit settings: Settings) extends StrictLogging 
       val file = File.newTemporaryFile()
       file.overwrite(unitTestGcpCredentials)
       logger.info(s"Set json key file to $file")
+      thisConf.set("fs.gs.project.id", System.getenv("COMET_TEST_GCP_PROJECT_ID"))
       thisConf.set("spark.hadoop.google.cloud.auth.service.account.enable", "true")
       thisConf.set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", file.pathAsString)
     }
