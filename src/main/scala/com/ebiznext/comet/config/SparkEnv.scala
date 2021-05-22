@@ -61,6 +61,8 @@ class SparkEnv(name: String)(implicit settings: Settings) extends StrictLogging 
     BigQueryUtils.unitTestLoadCredentials().foreach { unitTestGcpCredentials =>
       val file = File.newTemporaryFile()
       file.overwrite(unitTestGcpCredentials)
+      logger.info(s"Set json key file to $file")
+      thisConf.set("spark.hadoop.google.cloud.auth.service.account.enable", "true")
       thisConf.set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", file.pathAsString)
     }
     thisConf

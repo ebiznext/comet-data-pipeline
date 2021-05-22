@@ -25,7 +25,7 @@ class BigQueryHandlerSpec extends TestHelper {
         }
       }
     }
-    "trigger AutoJob with no parameters on SQL statement" should "generate a dataset in business" in {
+    "trigger AutoJob with no parameters on SQL statement" should "generate a dataset in BigQuery" in {
       if (doTest) {
         val businessTask1 = AutoTaskDesc(
           None,
