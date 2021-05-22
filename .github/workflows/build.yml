@@ -11,10 +11,6 @@ on:
   pull_request:
     branches:
       - '**'
-env:
-  COMET_TEST_GCP_CREDENTIALS: ${{ secrets.COMET_TEST_GCP_CREDENTIALS }}
-  COMET_TEST_GCP_PROJECT_ID: ${{ secrets.COMET_TEST_GCP_PROJECT_ID }}
-  COMET_TEST_GCS_BUCKET: comet-data-pipeline-test
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -25,6 +21,10 @@ jobs:
         with:
           java-version: 1.8
       - name: Run tests & Coverage Report
+        env:
+          COMET_TEST_GCP_CREDENTIALS: ${{ secrets.COMET_TEST_GCP_CREDENTIALS }}
+          COMET_TEST_GCP_PROJECT_ID: ${{ secrets.COMET_TEST_GCP_PROJECT_ID }}
+          COMET_TEST_GCS_BUCKET: comet-data-pipeline-test
         run: sbt coverage test coverageReport
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v1
