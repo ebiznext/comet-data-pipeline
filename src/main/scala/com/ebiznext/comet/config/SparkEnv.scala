@@ -22,6 +22,7 @@ package com.ebiznext.comet.config
 
 import better.files.File
 import com.ebiznext.comet.utils.BigQueryUtils
+import com.google.cloud.hadoop.io.bigquery.BigQueryConfiguration
 
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -63,7 +64,19 @@ class SparkEnv(name: String)(implicit settings: Settings) extends StrictLogging 
       file.overwrite(unitTestGcpCredentials)
       logger.info(s"Set json key file to $file")
 
-      thisConf.set("spark.hadoop.mapred.bq.project.id", System.getenv("COMET_TEST_GCP_PROJECT_ID"))
+      thisConf.set(
+        "spark.hadoop." + BigQueryConfiguration.PROJECT_ID_KEY,
+        System.getenv("COMET_TEST_GCP_PROJECT_ID")
+      )
+      thisConf
+        .set(
+          "spark.hadoop." + BigQueryConfiguration.INPUT_PROJECT_ID_KEY,
+          System.getenv("COMET_TEST_GCP_PROJECT_ID")
+        )
+      thisConf.set(
+        "spark.hadoop." + BigQueryConfiguration.OUTPUT_PROJECT_ID_KEY,
+        System.getenv("COMET_TEST_GCP_PROJECT_ID")
+      )
       thisConf.set("spark.hadoop.fs.gs.project.id", System.getenv("COMET_TEST_GCP_PROJECT_ID"))
       thisConf.set("spark.hadoop.google.cloud.auth.service.account.enable", "true")
       thisConf.set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", file.pathAsString)
