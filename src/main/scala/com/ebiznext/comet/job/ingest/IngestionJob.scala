@@ -6,6 +6,7 @@ import com.ebiznext.comet.job.index.connectionload.{ConnectionLoadConfig, Connec
 import com.ebiznext.comet.job.index.esload.{ESLoadConfig, ESLoadJob}
 import com.ebiznext.comet.job.ingest.ImprovedDataFrameContext._
 import com.ebiznext.comet.job.metrics.{AssertionJob, MetricsJob}
+import com.ebiznext.comet.job.validator.GenericRowValidator
 import com.ebiznext.comet.schema.handlers.{SchemaHandler, StorageHandler}
 import com.ebiznext.comet.schema.model.Rejection.{ColInfo, ColResult}
 import com.ebiznext.comet.schema.model.Trim.{BOTH, LEFT, RIGHT}
@@ -38,6 +39,12 @@ import scala.util.{Failure, Success, Try}
 /**
   */
 trait IngestionJob extends SparkJob {
+
+  protected val treeRowValidator: GenericRowValidator = Utils
+    .loadInstance[GenericRowValidator](settings.comet.treeValidatorClass)
+
+  protected val flatRowValidator: GenericRowValidator = Utils
+    .loadInstance[GenericRowValidator](settings.comet.rowValidatorClass)
 
   def domain: Domain
 
@@ -94,7 +101,8 @@ trait IngestionJob extends SparkJob {
     val start = Timestamp.from(Instant.now())
     IngestionUtil.sinkRejected(session, rejectedRDD, domainName, schemaName, now) match {
       case Success((rejectedDF, rejectedPath)) =>
-        if (settings.comet.sinkToFile)
+        // We sink to a file when running unit tests
+        if (settings.comet.sinkToFile) {
           sinkToFile(
             rejectedDF,
             rejectedPath,
@@ -103,6 +111,20 @@ trait IngestionJob extends SparkJob {
             merge = false,
             settings.comet.defaultRejectedWriteFormat
           )
+        } else {
+          settings.comet.audit.sink match {
+            case _: NoneSink | FsSink(_, _) =>
+              sinkToFile(
+                rejectedDF,
+                rejectedPath,
+                WriteMode.APPEND,
+                StorageArea.rejected,
+                merge = false,
+                settings.comet.defaultRejectedWriteFormat
+              )
+            case _ => // do nothing
+          }
+        }
         val end = Timestamp.from(Instant.now())
         val log = AuditLog(
           session.sparkContext.applicationId,
@@ -150,18 +172,7 @@ trait IngestionJob extends SparkJob {
   private def csvOutput(): Boolean =
     settings.comet.csvOutput && !settings.comet.grouped && metadata.partition.isEmpty && path.nonEmpty
 
-  /** Merge new and existing dataset if required
-    * Save using overwrite / Append mode
-    *
-    * @param acceptedDF
-    */
-  protected def saveAccepted(acceptedDF: DataFrame): (DataFrame, Path) = {
-    val start = Timestamp.from(Instant.now())
-    logger.whenDebugEnabled {
-      logger.debug(s"acceptedRDD SIZE ${acceptedDF.count()}")
-      acceptedDF.show(1000)
-    }
-
+  private def runAssertions(acceptedDF: DataFrame) = {
     if (settings.comet.assertions.active) {
       new AssertionJob(
         this.domain.name,
@@ -175,87 +186,43 @@ trait IngestionJob extends SparkJob {
         sql => session.sql(sql).count()
       ).run().getOrElse(throw new Exception("Should never happen"))
     }
+  }
 
+  private def runMetrics(acceptedDF: DataFrame) = {
     if (settings.comet.metrics.active) {
       new MetricsJob(this.domain, this.schema, Stage.UNIT, this.storageHandler, this.schemaHandler)
         .run(acceptedDF, System.currentTimeMillis())
     }
+  }
+
+  /** Merge new and existing dataset if required
+    * Save using overwrite / Append mode
+    *
+    * @param acceptedDF
+    */
+  protected def saveAccepted(acceptedDF: DataFrame): (DataFrame, Path) = {
+    val start = Timestamp.from(Instant.now())
+    logger.whenDebugEnabled {
+      logger.debug(s"acceptedRDD SIZE ${acceptedDF.count()}")
+      acceptedDF.show(1000)
+    }
+    runAssertions(acceptedDF)
+    runMetrics(acceptedDF)
+    val acceptedPath = new Path(DatasetArea.accepted(domain.name), schema.name)
+    val acceptedDfWithScriptFields: DataFrame = computeScriptedAttributes(acceptedDF)
+    val acceptedDfWithoutIgnoredFields: DataFrame = removeIgnoredAttributes(
+      acceptedDfWithScriptFields
+    )
+    val finalAcceptedDF: DataFrame = computeFinalSchema(acceptedDfWithoutIgnoredFields)
+    val mergedDF: DataFrame = applyMerge(acceptedPath, finalAcceptedDF)
+
+    val finalMergedDf: DataFrame = runPostSQL(mergedDF)
 
     val writeMode = getWriteMode()
-    val acceptedPath = new Path(DatasetArea.accepted(domain.name), schema.name)
 
-    val acceptedDfWithScriptFields = (if (schema.attributes.exists(_.script.isDefined)) {
-                                        val allColumns = "*"
-                                        schema.attributes.foldLeft(acceptedDF) {
-                                          case (
-                                                df,
-                                                Attribute(
-                                                  name,
-                                                  _,
-                                                  _,
-                                                  _,
-                                                  _,
-                                                  _,
-                                                  _,
-                                                  _,
-                                                  _,
-                                                  _,
-                                                  _,
-                                                  _,
-                                                  _,
-                                                  Some(script)
-                                                )
-                                              ) =>
-                                            df.T(
-                                              s"SELECT $allColumns, ${script.richFormat(options)} as $name FROM __THIS__"
-                                            )
-                                          case (df, _) => df
-                                        }
-                                      } else acceptedDF).drop(Settings.cometInputFileNameColumn)
-
-    val finalAcceptedDF: DataFrame = schema.attributes.exists(_.script.isDefined) match {
-      case true => {
-        logger.whenDebugEnabled {
-          logger.debug("Accepted Dataframe schema right after adding computed columns")
-          acceptedDfWithScriptFields.printSchema()
-        }
-        // adding computed columns can change the order of columns, we must force the order defined in the schema
-        val orderedWithScriptFieldsDF =
-          session.createDataFrame(
-            acceptedDfWithScriptFields.rdd,
-            schema.sparkTypeWithRenamedFields(schemaHandler)
-          )
-        logger.whenDebugEnabled {
-          logger.debug("Accepted Dataframe schema after applying the defined schema")
-          orderedWithScriptFieldsDF.printSchema()
-        }
-        orderedWithScriptFieldsDF
-      }
-      case false => acceptedDfWithScriptFields
-    }
-
-    val mergedDF = schema.merge
-      .map { mergeOptions =>
-        if (metadata.getSink().map(_.`type`).getOrElse(SinkType.None) == SinkType.BQ) {
-          val mergedDfBq = mergeFromBQ(finalAcceptedDF, mergeOptions)
-          mergedDfBq
-        } else {
-          mergeFromParquet(acceptedPath, finalAcceptedDF, mergeOptions)
-        }
-      }
-      .getOrElse(finalAcceptedDF)
-
-    val finalMergedDf = schema.postsql match {
-      case Some(queryList) =>
-        queryList.foldLeft(mergedDF) { (df, query) =>
-          df.createOrReplaceTempView("COMET_TABLE")
-          df.sparkSession.sql(query)
-        }
-      case _ => mergedDF
-    }
     logger.info("Final Dataframe Schema")
     finalMergedDf.printSchema()
-    val savedDataset =
+    val savedInFileDataset =
       if (settings.comet.sinkToFile)
         sinkToFile(
           finalMergedDf,
@@ -267,6 +234,22 @@ trait IngestionJob extends SparkJob {
         )
       else
         finalMergedDf
+
+    val sinkType = metadata.getSink().map(_.`type`)
+    val savedDataset = sinkType.getOrElse(SinkType.None) match {
+      case SinkType.FS | SinkType.None if !settings.comet.sinkToFile =>
+        // TODO do this inside the sink function below
+        sinkToFile(
+          finalMergedDf,
+          acceptedPath,
+          writeMode,
+          StorageArea.accepted,
+          schema.merge.isDefined,
+          settings.comet.defaultWriteFormat
+        )
+      case _ =>
+        savedInFileDataset
+    }
     logger.info("Saved Dataset Schema")
     savedDataset.printSchema()
     sink(finalMergedDf) match {
@@ -305,8 +288,99 @@ trait IngestionJob extends SparkJob {
           Step.SINK_ACCEPTED.toString
         )
         SparkAuditLogWriter.append(session, log)
+        throw exception
     }
     (savedDataset, acceptedPath)
+  }
+
+  private def runPostSQL(mergedDF: DataFrame) = {
+    val finalMergedDf = schema.postsql match {
+      case Some(queryList) =>
+        queryList.foldLeft(mergedDF) { (df, query) =>
+          df.createOrReplaceTempView("COMET_TABLE")
+          df.sparkSession.sql(query)
+        }
+      case _ => mergedDF
+    }
+    finalMergedDf
+  }
+
+  private def applyMerge(acceptedPath: Path, finalAcceptedDF: DataFrame) = {
+    val mergedDF = schema.merge
+      .map { mergeOptions =>
+        if (metadata.getSink().map(_.`type`).getOrElse(SinkType.None) == SinkType.BQ) {
+          val mergedDfBq = mergeFromBQ(finalAcceptedDF, mergeOptions)
+          mergedDfBq
+        } else {
+          mergeFromParquet(acceptedPath, finalAcceptedDF, mergeOptions)
+        }
+      }
+      .getOrElse(finalAcceptedDF)
+    mergedDF
+  }
+
+  private def computeFinalSchema(acceptedDfWithoutIgnoredFields: DataFrame) = {
+    val finalAcceptedDF: DataFrame = schema.attributes.exists(_.script.isDefined) match {
+      case true => {
+        logger.whenDebugEnabled {
+          logger.debug("Accepted Dataframe schema right after adding computed columns")
+          acceptedDfWithoutIgnoredFields.printSchema()
+        }
+        // adding computed columns can change the order of columns, we must force the order defined in the schema
+        val orderedWithScriptFieldsDF =
+          session.createDataFrame(
+            acceptedDfWithoutIgnoredFields.rdd,
+            schema.finalSparkSchema(schemaHandler)
+          )
+        logger.whenDebugEnabled {
+          logger.debug("Accepted Dataframe schema after applying the defined schema")
+          acceptedDfWithoutIgnoredFields.printSchema()
+        }
+        orderedWithScriptFieldsDF
+      }
+      case false => acceptedDfWithoutIgnoredFields
+    }
+    finalAcceptedDF
+  }
+
+  private def removeIgnoredAttributes(acceptedDfWithScriptFields: DataFrame) = {
+    val ignoredAttributes = schema.attributes.filter(_.isIgnore()).map(_.name)
+    val acceptedDfWithoutIgnoredFields = acceptedDfWithScriptFields.drop(ignoredAttributes: _*)
+    acceptedDfWithoutIgnoredFields
+  }
+
+  private def computeScriptedAttributes(acceptedDF: DataFrame) = {
+    val acceptedDfWithScriptFields = (if (schema.attributes.exists(_.script.isDefined)) {
+                                        val allColumns = "*"
+                                        schema.attributes.foldLeft(acceptedDF) {
+                                          case (
+                                                df,
+                                                Attribute(
+                                                  name,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  _,
+                                                  Some(script),
+                                                  _,
+                                                  _
+                                                )
+                                              ) =>
+                                            df.T(
+                                              s"SELECT $allColumns, ${script.richFormat(options)} as $name FROM __THIS__"
+                                            )
+                                          case (df, _) => df
+                                        }
+                                      } else acceptedDF).drop(Settings.cometInputFileNameColumn)
+    acceptedDfWithScriptFields
   }
 
   private[this] def sink(mergedDF: DataFrame): Try[Unit] = {
@@ -360,8 +434,8 @@ trait IngestionJob extends SparkJob {
           }
 
         case SinkType.KAFKA =>
-          Utils.withResources(new KafkaClient(settings.comet.kafka)) { client =>
-            client.sinkToTopic(settings.comet.kafka.topics(schema.name), mergedDF)
+          Utils.withResources(new KafkaClient(settings.comet.kafka)) { kafkaClient =>
+            kafkaClient.sinkToTopic(settings.comet.kafka.topics(schema.name), mergedDF)
           }
         case SinkType.JDBC =>
           val (createDisposition: CreateDisposition, writeDisposition: WriteDisposition) = {
@@ -397,8 +471,9 @@ trait IngestionJob extends SparkJob {
                 throw e
             }
           }
-        case SinkType.None =>
-          // ignore
+        case SinkType.None | SinkType.FS =>
+          // Done in the caller
+          // TODO do it here instead
           logger.trace("not producing an index, as requested (no sink or sink at None explicitly)")
       }
     }
@@ -432,7 +507,7 @@ trait IngestionJob extends SparkJob {
           if (writeMode.toSaveMode == SaveMode.Overwrite)
             session.sql(s"drop table if exists $hiveDB.$tableName")
         } match {
-          case Success(dataframe) => ;
+          case Success(_) => ;
           case Failure(e) =>
             logger.warn("Ignore error when hdfs files not found")
             Utils.logException(logger, e)
@@ -667,11 +742,14 @@ trait IngestionJob extends SparkJob {
     logger.info(s"""inputDF field list=${in.schema.fields.map(_.name).mkString(",")}""")
 
     // Force ordering again of columns to be the same since join operation change it otherwise except below won"'t work.
+
+    // commonDF contains records present in the exiting and incoming datatsets
     val commonDF =
       existing
         .join(in.select(merge.key.head, merge.key.tail: _*), merge.key)
         .select(in.columns.map(col): _*)
 
+    // For items present in the existing and incoming datasets. We keep only the last occurrence and delete the older ones.
     val toDeleteDF = merge.timestamp.map { timestamp =>
       val w =
         Window.partitionBy(merge.key.head, merge.key.tail: _*).orderBy(col(timestamp).desc)
@@ -681,6 +759,7 @@ trait IngestionJob extends SparkJob {
         .drop("rownum")
     } getOrElse commonDF
 
+    // We remove from the incoming data the records to delete
     val updatesDF = merge.delete
       .map(condition => in.filter(s"not ($condition)"))
       .getOrElse(in)
@@ -881,7 +960,7 @@ object IngestionUtil {
       .createDataFrame(
         rejectedTypedRDD.toDF().rdd,
         StructType(
-          rejectedCols.map { case (attrName, sqlType, sparkType) =>
+          rejectedCols.map { case (attrName, _, sparkType) =>
             StructField(attrName, sparkType, nullable = false)
           }
         )
@@ -924,6 +1003,8 @@ object IngestionUtil {
           // TODO Sink Rejected Log to ES
           throw new Exception("Sinking Audit log to Elasticsearch not yet supported")
         case _: NoneSink | FsSink(_, _) =>
+          // We save in the caller
+          // TODO rewrite this one
           Success(())
       }
     res match {

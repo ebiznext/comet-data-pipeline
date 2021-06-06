@@ -18,6 +18,8 @@ metadata:
 schemas:
   - name: "segment"
     pattern: "OneClient_Segmentation.*.*"
+    primaryKey:
+      - dream_id
     attributes:
       - name: "dream_id"
         type: "long"
@@ -25,7 +27,6 @@ schemas:
         privacy: "NONE"
         rename: "dreamkey"
         comment: ""
-
       - name: "segmentation_label"
         type: "string"
         required: false
@@ -47,12 +48,14 @@ schemas:
     attributes:
       - name: "dream_id"
         type: "long"
+        foreignKey: "segment"
         required: false
         privacy: "NONE"
       - name: "gender"
         type: "string"
         required: false
         privacy: "NONE"
+        ignore: true
       - name: "birthdate_day"
         type: "long"
         required: false

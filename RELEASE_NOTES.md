@@ -1,5 +1,28 @@
 # Release notes
 
+# 0.2.3
+- Add ability to ignore some fields (only top level fields supported)
+- Handle multiple schemas during extraction
+- Improve InferSchmaJob
+- Include primary keys & foreign keys in DDL2Yml
+
+## 0.2.2
+__New feature__:
+- Use the same variable for Lock timeout
+- Improve logging when locking file fails
+- File sink while still the default is now controlled by the sink tag in the YAML file. The option sink-to-file is removed and used for testing purpose only.
+- Allow custom topic name for comet_offsets
+- Add ability to coalesce(int) to kafka offloading feature
+- Attributes may now be declared as primary and or foreign keys even though no check is made.  
+- Export schema and  relations(PK / FK) as dot (graphviz) files.
+- Support saving comet offsets to filesystem instead of kafka using the new setting comet-offsets-mode = "STREAM"
+
+__Bug Fix__:
+- Invalid YAML files produce now an error at startup instead of displaying a warning.
+
+## 0.2.1
+- Version skipped
+
 ## 0.2.0
 __New feature__:
 - Export all tables in DDL2YML generation

@@ -27,7 +27,7 @@ import com.ebiznext.comet.schema.handlers.{
   LaunchHandler,
   SimpleLauncher
 }
-import com.ebiznext.comet.schema.model.{PrivacyLevel, Sink}
+import com.ebiznext.comet.schema.model.{Mode, PrivacyLevel, Sink}
 import com.ebiznext.comet.utils.{CometObjectMapper, Utils, Version}
 import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -156,8 +156,7 @@ object Settings extends StrictLogging {
 
   final case class Lock(
     path: String,
-    metricsTimeout: Long,
-    ingestionTimeout: Long,
+    timeout: Long,
     pollTime: FiniteDuration = FiniteDuration(5000L, TimeUnit.MILLISECONDS),
     refreshTime: FiniteDuration = FiniteDuration(5000L, TimeUnit.MILLISECONDS)
   )
@@ -171,6 +170,7 @@ object Settings extends StrictLogging {
 
   final case class KafkaTopicConfig(
     topicName: String,
+    topicOffsetMode: Option[Mode] = Some(Mode.STREAM), // used only for comet_offsets
     maxRead: Long = -1,
     fields: List[String] = List("key as STRING", "value as STRING"),
     partitions: Int = 1,
@@ -182,7 +182,8 @@ object Settings extends StrictLogging {
 
   final case class KafkaConfig(
     serverOptions: Map[String, String],
-    topics: Map[String, KafkaTopicConfig]
+    topics: Map[String, KafkaTopicConfig],
+    cometOffsetsMode: Option[String] = Some("STREAM")
   )
 
   /** @param datasets       : Absolute path, datasets root folder beneath which each area is defined.
@@ -217,6 +218,7 @@ object Settings extends StrictLogging {
     launcher: String,
     chewerPrefix: String,
     rowValidatorClass: String,
+    treeValidatorClass: String,
     loadStrategyClass: String,
     analyze: Boolean,
     hive: Boolean,

@@ -18,6 +18,8 @@ object YamlSerializer extends LazyLogging {
 
   def serialize(domain: Domain): String = mapper.writeValueAsString(domain)
 
+  def serializeObject(obj: Object): String = mapper.writeValueAsString(obj)
+
   def toMap(job: AutoJobDesc)(implicit settings: Settings): Map[String, Any] = {
     val jobWriter = mapper
       .writer()
@@ -27,11 +29,11 @@ object YamlSerializer extends LazyLogging {
     mapper.readValue(jsonContent, classOf[Map[String, Any]])
   }
 
-  def serialize(jdbcSchema: JDBCSchema): String = mapper.writeValueAsString(jdbcSchema)
+  def serialize(jdbcSchemas: JDBCSchemas): String = mapper.writeValueAsString(jdbcSchemas)
 
-  def deserializeJDBCSchema(file: File) = {
+  def deserializeJDBCSchemas(file: File): JDBCSchemas = {
     val rootNode = mapper.readTree(file.newInputStream)
-    val extractNode = rootNode.path("jdbc-schema")
+    val extractNode = rootNode.path("extract")
     val jdbcNode =
       if (extractNode.isNull() || extractNode.isMissingNode) {
         logger.warn(
@@ -40,7 +42,7 @@ object YamlSerializer extends LazyLogging {
         rootNode
       } else
         extractNode
-    mapper.treeToValue(jdbcNode, classOf[JDBCSchema])
+    mapper.treeToValue(jdbcNode, classOf[JDBCSchemas])
   }
 
   def deserializeDomain(file: File): Try[Domain] = {

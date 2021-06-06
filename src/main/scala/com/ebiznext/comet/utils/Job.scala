@@ -1,13 +1,11 @@
 package com.ebiznext.comet.utils
 
 import com.ebiznext.comet.config.{Settings, SparkEnv, UdfRegistration}
-import com.ebiznext.comet.schema.handlers.StorageHandler
 import com.ebiznext.comet.schema.model.SinkType.{BQ, FS, JDBC, KAFKA}
 import com.ebiznext.comet.schema.model.{Metadata, SinkType, Views}
 import com.ebiznext.comet.utils.Formatter._
 import com.ebiznext.comet.utils.kafka.KafkaClient
 import com.typesafe.scalalogging.StrictLogging
-import org.apache.hadoop.fs.Path
 import org.apache.spark.sql._
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions
 import org.apache.spark.sql.functions._
@@ -37,6 +35,9 @@ trait JobBase extends StrictLogging {
 
   type JdbcConfigName = String
 
+  /** @param valueWithEnv in the form [SinkType:[configName:]]viewName
+    * @return (SinkType, configName, viewName)
+    */
   protected def parseViewDefinition(
     valueWithEnv: String
   ): (SinkType, Option[JdbcConfigName], String) = {
@@ -222,19 +223,19 @@ trait SparkJob extends JobBase {
     views.views.foreach { case (key, value) =>
       // Apply substitution defined with {{ }} and overload options in env by option in command line
       val valueWithEnv = value.richFormat(sqlParameters)
-      val (format, configName, path) = parseViewDefinition(valueWithEnv)
-      logger.info(s"Loading view $path from $format")
-      val df = format match {
-        case FS =>
+      val (sinkType, sinkConfig, path) = parseViewDefinition(valueWithEnv)
+      logger.info(s"Loading view $path from $sinkType")
+      val df = sinkType match {
+        case FS => // (FS, _, absolute_path|relative_path|sql)
           if (path.startsWith("/"))
             session.read.parquet(path)
           else if (path.trim.toLowerCase.startsWith("select "))
             session.sql(path)
           else
             session.read.parquet(s"${settings.comet.datasets}/$path")
-        case JDBC =>
+        case JDBC => // (JDBC, connectionName, queryString)
           val jdbcConfig =
-            settings.comet.connections(configName.getOrElse((throw new Exception(""))))
+            settings.comet.connections(sinkConfig.getOrElse((throw new Exception(""))))
           jdbcConfig.options
             .foldLeft(session.read)((w, kv) => w.option(kv._1, kv._2))
             .format(jdbcConfig.format)
@@ -242,16 +243,16 @@ trait SparkJob extends JobBase {
             .load()
             .cache()
 
-        case KAFKA =>
-          configName match {
+        case KAFKA => // (KAFKA, STREAM|FILE, topic)
+          sinkConfig match {
             case Some(x) if x.toLowerCase() == "stream" =>
-              Utils.withResources(new KafkaClient(settings.comet.kafka)) { kafkaJob =>
-                kafkaJob.consumeTopicStreaming(session, settings.comet.kafka.topics(path))
+              Utils.withResources(new KafkaClient(settings.comet.kafka)) { kafkaClient =>
+                kafkaClient.consumeTopicStreaming(session, settings.comet.kafka.topics(path))
               }
             case _ =>
-              Utils.withResources(new KafkaClient(settings.comet.kafka)) { kafkaJob =>
+              Utils.withResources(new KafkaClient(settings.comet.kafka)) { kafkaClient =>
                 val (dataframe, _) =
-                  kafkaJob.consumeTopicBatch(path, session, settings.comet.kafka.topics(path))
+                  kafkaClient.consumeTopicBatch(path, session, settings.comet.kafka.topics(path))
                 dataframe
               }
 
@@ -306,67 +307,6 @@ trait SparkJob extends JobBase {
       }
       df.createOrReplaceTempView(key)
       logger.info(s"Created view $key")
-    }
-  }
-
-  /** Saves a dataset. If the path is empty (the first time we call metrics on the schema) then we can write.
-    *
-    * If there's already parquet files stored in it, then create a temporary directory to compute on, and flush
-    * the path to move updated metrics in it
-    *
-    * @param dataToSave :   dataset to be saved
-    * @param path       :   Path to save the file at
-    */
-  protected def appendToFile(
-    storageHandler: StorageHandler,
-    dataToSave: DataFrame,
-    path: Path,
-    datasetName: String,
-    tableName: String
-  ): Unit = {
-    if (storageHandler.exists(path)) {
-      val pathIntermediate = new Path(path.getParent, ".tmp")
-
-      logger.whenDebugEnabled {
-        session.read.parquet(path.toString).show(false)
-      }
-      val dataByVariableStored: DataFrame = session.read
-        .parquet(path.toString)
-        .union(dataToSave)
-
-      if (settings.comet.hive) {
-        val hiveDB = datasetName
-        val fullTableName = s"$hiveDB.$tableName"
-        session.sql(s"create database if not exists $hiveDB")
-        session.sql(s"use $hiveDB")
-        dataByVariableStored
-          .coalesce(1)
-          .write
-          .mode(SaveMode.Append)
-          .format("parquet")
-          .saveAsTable(fullTableName)
-      } else {
-        dataByVariableStored
-          .coalesce(1)
-          .write
-          .mode(SaveMode.Append)
-          .format("parquet")
-          .save(pathIntermediate.toString)
-      }
-
-      storageHandler.delete(path)
-      storageHandler.move(pathIntermediate, path)
-      logger.whenDebugEnabled {
-        session.read.parquet(path.toString).show(1000, truncate = false)
-      }
-    } else {
-      storageHandler.mkdirs(path)
-      dataToSave
-        .coalesce(1)
-        .write
-        .mode(SaveMode.Append)
-        .parquet(path.toString)
-
     }
   }
 }

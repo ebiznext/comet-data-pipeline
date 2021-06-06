@@ -62,12 +62,14 @@ case class Attribute(
   default: Option[String] = None,
   tags: Option[Set[String]] = None,
   trim: Option[Trim] = None,
-  script: Option[String] = None
+  script: Option[String] = None,
+  foreignKey: Option[String] = None, // [domain.]table.attribute
+  ignore: Option[Boolean] = None
 ) extends LazyLogging {
 
   override def toString: String =
     // we pretend the "settings" field does not exist
-    s"Attribute(${name},${`type`},${array},${required},${privacy},${comment},${rename},${metricType},${attributes},${position},${default},${tags})"
+    s"Attribute(${name},${`type`},${array},${required},${getPrivacy()},${comment},${rename},${metricType},${attributes},${position},${default},${tags})"
 
   /** Check attribute validity
     * An attribute is valid if :
@@ -111,7 +113,7 @@ case class Attribute(
           Try(someTpe.sparkValue(default)) match {
             case Success(_) =>
             case Failure(e) =>
-              errorList += s"attribute with name $name: Invalid default value for tha attribute type ${e.getMessage()}"
+              errorList += s"attribute with name $name: Invalid default value for this attribute type ${e.getMessage()}"
           }
         }
       }
@@ -232,11 +234,13 @@ case class Attribute(
   @JsonIgnore
   def getFinalName(): String = rename.getOrElse(name)
 
-  def getPrivacy(): PrivacyLevel = Option(this.privacy).getOrElse(PrivacyLevel.None)
+  def isIgnore(): Boolean = ignore.getOrElse(false)
 
-  def isArray(): Boolean = this.array.getOrElse(false)
+  def getPrivacy(): PrivacyLevel = Option(privacy).getOrElse(PrivacyLevel.None)
 
-  def isRequired(): Boolean = Option(this.required).getOrElse(false)
+  def isArray(): Boolean = array.getOrElse(false)
+
+  def isRequired(): Boolean = Option(required).getOrElse(false)
 
   @JsonIgnore
   def getMetricType(schemaHandler: SchemaHandler): MetricType = {

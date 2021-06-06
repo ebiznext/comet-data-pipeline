@@ -1,5 +1,5 @@
 ---
-sidebar_position: 8
+sidebar_position: 80
 title: cnxload
 ---
 
@@ -9,6 +9,8 @@ title: cnxload
 **comet cnxload [options]**
 
 ## Description
+
+Load parquet file into JDBC Table.
 
 
 ## Parameters
