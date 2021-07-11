@@ -1,9 +1,9 @@
-COMET_VERSION="${COMET_VERSION:-0.2.1}"
-SPARK_VERSION="${SPARK_VERSION:-3.1.1}"
-HADOOP_VERSION="${HADOOP_VERSION:-3.2}"
+export COMET_VERSION="${COMET_VERSION:-0.2.6-SNAPSHOT}"
+export SPARK_VERSION="${SPARK_VERSION:-3.1.1}"
+export HADOOP_VERSION="${HADOOP_VERSION:-3.2}"
 
-COMET_JAR_NAME=comet-spark3_2.12-$COMET_VERSION-assembly.jar
-COMET_JAR_FULL_NAME=../bin/$COMET_JAR_NAME
+export COMET_JAR_NAME=comet-spark3_2.12-$COMET_VERSION-assembly.jar
+export COMET_JAR_FULL_NAME=../bin/$COMET_JAR_NAME
 
 echo "COMET_VERSION=$COMET_VERSION"
 echo "SPARK_VERSION=$SPARK_VERSION"
@@ -19,8 +19,9 @@ echo "COMET_JAR_URL=$COMET_JAR_URL"
 SPARK_DIR_NAME=spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION
 SPARK_TGZ_NAME=$SPARK_DIR_NAME.tgz
 SPARK_TGZ_URL=https://downloads.apache.org/spark/spark-$SPARK_VERSION/$SPARK_TGZ_NAME
-SPARK_SUBMIT=../bin/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION/bin/spark-submit
-SPARK_DIR="$PWD/../bin/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION"
+
+export SPARK_SUBMIT=../bin/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION/bin/spark-submit
+export SPARK_DIR="$PWD/../bin/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION"
 
 initEnv() {
   PROG_DIR=$(cd `dirname $0` && pwd)
@@ -66,10 +67,10 @@ initEnv() {
   fi
   if test -f $SPARK_SUBMIT; then
       echo "$SPARK_SUBMIT found in ../bin/"
-      echo "Local env initialized correctly"
+      echo "SUCCESS: Local env initialized correctly"
   else
     echo "$SPARK_SUBMIT not found !!!"
-    echo "Failed to initialize environment"
+    echo "FAILURE: Failed to initialize environment"
     exit 2
   fi
 }

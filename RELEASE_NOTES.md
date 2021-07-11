@@ -1,10 +1,28 @@
 # Release notes
 
+# 0.2.6
+__New feature__:
+- Support XML Schema inference
+- Support the ability to reject the whole file on error
+- Improve error reporting
+
+
+# 0.2.4 / 0.2.5
+__Bug Fix__:
+- Handle [Jackson bug](https://www.google.fr/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&ved=2ahUKEwjo9qr3v4PxAhWNohQKHfh1CqoQFjAAegQIAhAD&url=https%3A%2F%2Fgithub.com%2FFasterXML%2Fjackson-module-scala%2Fissues%2F218&usg=AOvVaw02niMBgrqd-BWw7-e1YQfc)
+
 # 0.2.3
+__New feature__:
 - Add ability to ignore some fields (only top level fields supported)
-- Handle multiple schemas during extraction
-- Improve InferSchmaJob
+- **BREAKING CHANGE**: Handle multiple schemas during extraction. Update your `extract` configurations before migrating to this version.
+- Improve InferSchemaJob
 - Include primary keys & foreign keys in DDL2Yml
+
+__Bug Fix__:
+- Handle rename in JSON / XML files
+- Handle timestamp fields in JSON / XML files
+- Do not partition rejected files
+- Add COMET_CSV_OUTPUT_EXT env var to customize filename extension after ingestion when CSV is active.  
 
 ## 0.2.2
 __New feature__:

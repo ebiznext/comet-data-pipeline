@@ -25,6 +25,7 @@ import com.ebiznext.comet.schema.handlers.{SchemaHandler, SimpleLauncher, Storag
 import com.ebiznext.comet.schema.model.AutoJobDesc
 import com.ebiznext.comet.utils.{CometObjectMapper, Utils}
 import com.ebiznext.comet.workflow.IngestionWorkflow
+import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
@@ -33,7 +34,6 @@ import com.typesafe.scalalogging.StrictLogging
 import org.apache.commons.io.FileUtils
 import org.apache.commons.io.filefilter.TrueFileFilter
 import org.apache.hadoop.fs.Path
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.scalatest.flatspec.AnyFlatSpec
@@ -167,14 +167,6 @@ trait TestHelper extends AnyFlatSpec with Matchers with BeforeAndAfterAll with S
 
   def getResPath(path: String): String = getClass.getResource(path).toURI.getPath
 
-  def prepareDateColumns(df: DataFrame): DataFrame = {
-    df.withColumn("comet_date", current_date())
-      .withColumn("year", year(col("comet_date")))
-      .withColumn("month", month(col("comet_date")))
-      .withColumn("day", dayofmonth(col("comet_date")))
-      .drop("comet_date")
-  }
-
   def prepareSchema(schema: StructType): StructType =
     StructType(schema.fields.filterNot(f => List("year", "month", "day").contains(f.name)))
 
@@ -195,6 +187,7 @@ trait TestHelper extends AnyFlatSpec with Matchers with BeforeAndAfterAll with S
       val mapper = new CometObjectMapper(new YAMLFactory(), (classOf[Settings], settings) :: Nil)
       mapper
     }
+    mapper.setSerializationInclusion(Include.NON_EMPTY)
 
     def deliverTestFile(importPath: String, targetPath: Path)(implicit codec: Codec): Unit = {
       val content = loadTextFile(importPath)
